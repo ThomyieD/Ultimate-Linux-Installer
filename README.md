@@ -9,15 +9,16 @@ Vom USB-Stick booten → grafischer Installer (kein manuelles Live-Desktop-Gefri
 
 ## Fertige ISO herunterladen
 
-Die bootfähige ISO liegt **nicht** im Git-Repository (zu groß, ändert sich mit jedem Release).
+**Ja: Ubuntu, Debian, Fedora usw. liegen nicht auf dem Stick.** Die werden erst während der Installation von den offiziellen Spiegeln geladen. Deshalb ist die ISO kein Multi-Gigabyte-Paket wie ein Stick voller Distro-ISOs.
 
-Stattdessen:
+Trotzdem enthält die ISO ein **komplettes bootfähiges Live-System**: Kernel, Treiber/Firmware, Netzwerk, Partitionswerkzeuge und die grafische Installer-Oberfläche (Qt). Das sind typischerweise einige hundert MB bis ca. 1–2 GB – klein im Vergleich zu „alle Distros mitnehmen“, aber **zu groß und ungeeignet für Git** (GitHub-Limits, Repo-Aufblähung, jede Version eine neue Binärdatei).
 
-1. Öffne **[Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases)**
-2. Lade `ultimate-linux-installer-*.iso` herunter
-3. Schreibe sie mit Rufus, balenaEtcher oder `dd` auf einen USB-Stick (GPT + UEFI)
+Deshalb liegt die fertige ISO unter **[Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases)**, nicht im Git-Tree:
 
-Falls noch kein Release mit ISO existiert, wird gerade die erste gebaut bzw. du kannst sie selbst erzeugen (siehe unten).
+1. Release öffnen und `ultimate-linux-installer-*.iso` laden
+2. Mit Rufus, balenaEtcher oder `dd` auf USB schreiben (GPT + UEFI)
+
+Solange noch kein Release mit ISO existiert, musst du sie einmal bauen (siehe unten) – oder wir erzeugen sie und hängen sie an ein Release.
 
 ## Funktionen (MVP)
 

@@ -9,9 +9,9 @@ Boot from USB → graphical installer (not a manual live-desktop workflow) → d
 
 ## Download a ready ISO
 
-The bootable ISO is **not** stored in the Git repository (too large; changes every release).
+**Distro ISOs are not on the stick** — they are downloaded from official mirrors during installation. The installer ISO is therefore much smaller than a “bundle every distro” USB.
 
-Get it from **[Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases)** instead, then flash with Rufus, balenaEtcher, or `dd` (GPT + UEFI).
+It still ships a **full bootable live environment** (kernel, firmware, networking, disk tools, Qt UI), typically a few hundred MB up to ~1–2 GB. That is too large / impractical for Git, so the ISO is published under **[Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases)** instead.
 
 ## Features (MVP)
 
