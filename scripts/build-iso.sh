@@ -10,6 +10,14 @@ fi
 
 chmod +x config/hooks/normal/*.hook.chroot 2>/dev/null || true
 
+# Wipe auto-generated lb config leftovers (keep our tracked overlays only)
+mkdir -p config/package-lists config/hooks/normal config/includes.chroot
+find config -mindepth 1 -maxdepth 1 \
+  ! -name 'package-lists' \
+  ! -name 'hooks' \
+  ! -name 'includes.chroot' \
+  -exec rm -rf {} +
+
 # Never rsync live-build into itself (causes recursive nesting + disk fill)
 rm -rf config/includes.chroot/opt/uli
 mkdir -p config/includes.chroot/opt/uli/src
@@ -27,8 +35,10 @@ rsync -a \
 
 lb clean --purge || lb clean || true
 
+UBU="http://archive.ubuntu.com/ubuntu/"
 # Compatible with Ubuntu's live-build 3.0~a57 (Ubuntu live image)
 lb config \
+  --ignore-system-defaults \
   --mode ubuntu \
   --architectures amd64 \
   --binary-images iso-hybrid \
@@ -39,12 +49,20 @@ lb config \
   --parent-distribution jammy \
   --archive-areas "main restricted universe multiverse" \
   --parent-archive-areas "main restricted universe multiverse" \
-  --mirror-bootstrap "http://archive.ubuntu.com/ubuntu/" \
-  --mirror-chroot "http://archive.ubuntu.com/ubuntu/" \
-  --mirror-binary "http://archive.ubuntu.com/ubuntu/" \
-  --parent-mirror-bootstrap "http://archive.ubuntu.com/ubuntu/" \
-  --parent-mirror-chroot "http://archive.ubuntu.com/ubuntu/" \
-  --parent-mirror-binary "http://archive.ubuntu.com/ubuntu/" \
+  --mirror-bootstrap "$UBU" \
+  --mirror-chroot "$UBU" \
+  --mirror-binary "$UBU" \
+  --mirror-chroot-security "$UBU" \
+  --mirror-binary-security "$UBU" \
+  --mirror-chroot-volatile "$UBU" \
+  --mirror-binary-volatile "$UBU" \
+  --parent-mirror-bootstrap "$UBU" \
+  --parent-mirror-chroot "$UBU" \
+  --parent-mirror-binary "$UBU" \
+  --parent-mirror-chroot-security "$UBU" \
+  --parent-mirror-binary-security "$UBU" \
+  --parent-mirror-chroot-volatile "$UBU" \
+  --parent-mirror-binary-volatile "$UBU" \
   --apt-indices false \
   --apt-recommends false \
   --firmware-chroot true \
@@ -53,6 +71,7 @@ lb config \
   --iso-preparer "ULI" \
   --iso-publisher "Ultimate Linux Installer" \
   --iso-volume "ULI_0_1_0"
+
 
 
 echo "Starting lb build (this can take a long time)..."
