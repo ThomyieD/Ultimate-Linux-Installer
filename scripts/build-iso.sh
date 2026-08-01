@@ -65,7 +65,8 @@ lb config \
   --parent-mirror-binary-volatile "$UBU" \
   --apt-indices false \
   --apt-recommends false \
-  --firmware-chroot true \
+  --firmware-chroot false \
+  --firmware-binary false \
   --security false \
   --iso-application "Ultimate Linux Installer" \
   --iso-preparer "ULI" \
