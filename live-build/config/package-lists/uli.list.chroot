@@ -1,10 +1,10 @@
-# Ultimate Linux Installer – live packages
+# Ultimate Linux Installer – live packages (Ubuntu jammy live-build)
 live-boot
 live-config
 live-config-systemd
 live-tools
 
-# Minimal graphical stack for the installer UI
+# Minimal graphical stack
 xorg
 xserver-xorg-core
 xserver-xorg-input-all
@@ -15,17 +15,13 @@ dbus-x11
 lightdm
 lightdm-gtk-greeter
 
-# Networking
+# Networking / firmware
 network-manager
 wireless-tools
-firmware-linux
-firmware-linux-nonfree
-firmware-iwlwifi
-firmware-realtek
-firmware-misc-nonfree
+linux-firmware
 ca-certificates
 
-# Python runtime (PySide6 installed via pip in chroot hook)
+# Python runtime (PySide6 via pip in chroot hook)
 python3
 python3-pip
 python3-venv
@@ -33,7 +29,7 @@ python3-yaml
 python3-requests
 python3-psutil
 
-# Qt / OpenGL runtime libs commonly required by PySide6 wheels
+# Qt runtime libs for PySide6 wheels
 libgl1
 libglib2.0-0
 libxkbcommon0
@@ -46,7 +42,7 @@ libxrender1
 libxi6
 libegl1
 
-# Disk / boot tools used by the installer
+# Disk / boot tools
 gdisk
 parted
 dosfstools

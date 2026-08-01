@@ -27,28 +27,24 @@ rsync -a \
 
 lb clean --purge || lb clean || true
 
-# Compatible with Ubuntu's live-build 3.0~a57 option set
+# Compatible with Ubuntu's live-build 3.0~a57 (Ubuntu live image)
 lb config \
-  --mode debian \
+  --mode ubuntu \
   --architectures amd64 \
   --binary-images iso-hybrid \
   --bootloader grub \
   --bootappend-live "boot=live components quiet splash hostname=uli-live username=uli locales=de_DE.UTF-8 keyboard-layouts=de timezone=Europe/Berlin" \
   --debian-installer false \
-  --distribution bookworm \
-  --parent-distribution bookworm \
-  --archive-areas "main contrib non-free non-free-firmware" \
-  --parent-archive-areas "main contrib non-free non-free-firmware" \
-  --mirror-bootstrap "https://deb.debian.org/debian/" \
-  --mirror-chroot "https://deb.debian.org/debian/" \
-  --mirror-binary "https://deb.debian.org/debian/" \
-  --mirror-chroot-security "https://security.debian.org/debian-security/" \
-  --mirror-binary-security "https://security.debian.org/debian-security/" \
-  --parent-mirror-bootstrap "https://deb.debian.org/debian/" \
-  --parent-mirror-chroot "https://deb.debian.org/debian/" \
-  --parent-mirror-binary "https://deb.debian.org/debian/" \
-  --parent-mirror-chroot-security "https://security.debian.org/debian-security/" \
-  --parent-mirror-binary-security "https://security.debian.org/debian-security/" \
+  --distribution jammy \
+  --parent-distribution jammy \
+  --archive-areas "main restricted universe multiverse" \
+  --parent-archive-areas "main restricted universe multiverse" \
+  --mirror-bootstrap "http://archive.ubuntu.com/ubuntu/" \
+  --mirror-chroot "http://archive.ubuntu.com/ubuntu/" \
+  --mirror-binary "http://archive.ubuntu.com/ubuntu/" \
+  --parent-mirror-bootstrap "http://archive.ubuntu.com/ubuntu/" \
+  --parent-mirror-chroot "http://archive.ubuntu.com/ubuntu/" \
+  --parent-mirror-binary "http://archive.ubuntu.com/ubuntu/" \
   --apt-indices false \
   --apt-recommends false \
   --firmware-chroot true \
