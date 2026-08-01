@@ -1,0 +1,5 @@
+# Force LF for shell scripts so Linux builds don't break
+*.sh text eol=lf
+*.hook.chroot text eol=lf
+*.hook.binary text eol=lf
+Makefile text eol=lf
