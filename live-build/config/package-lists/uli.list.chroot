@@ -54,3 +54,9 @@ sudo
 locales
 keyboard-configuration
 console-setup
+
+shim-signed
+grub-efi-amd64-signed
+syslinux
+isolinux
+

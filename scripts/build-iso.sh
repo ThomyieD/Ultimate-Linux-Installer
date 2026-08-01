@@ -42,7 +42,7 @@ lb config \
   --mode ubuntu \
   --architectures amd64 \
   --binary-images iso-hybrid \
-  --bootloader grub \
+  --bootloader syslinux \
   --bootappend-live "boot=live components quiet splash hostname=uli-live username=uli locales=de_DE.UTF-8 keyboard-layouts=de timezone=Europe/Berlin" \
   --debian-installer false \
   --distribution jammy \
