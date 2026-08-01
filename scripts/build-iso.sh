@@ -30,14 +30,14 @@ rm -rf config/includes.chroot/opt/uli/src/live-build \
 
 lb clean --purge || lb clean || true
 
-# Ubuntu hosts often need explicit debian mode + mirror
+# Compatible with Ubuntu's live-build 3.0~a57 option set
 lb config \
   --mode debian \
   --architectures amd64 \
   --binary-images iso-hybrid \
-  --bootloaders "grub-efi,syslinux" \
+  --bootloader grub \
   --bootappend-live "boot=live components quiet splash hostname=uli-live username=uli locales=de_DE.UTF-8 keyboard-layouts=de timezone=Europe/Berlin" \
-  --debian-installer none \
+  --debian-installer false \
   --distribution bookworm \
   --parent-distribution bookworm \
   --archive-areas "main contrib non-free non-free-firmware" \
@@ -47,14 +47,19 @@ lb config \
   --mirror-binary "https://deb.debian.org/debian/" \
   --mirror-chroot-security "https://security.debian.org/debian-security/" \
   --mirror-binary-security "https://security.debian.org/debian-security/" \
+  --parent-mirror-bootstrap "https://deb.debian.org/debian/" \
+  --parent-mirror-chroot "https://deb.debian.org/debian/" \
+  --parent-mirror-binary "https://deb.debian.org/debian/" \
+  --parent-mirror-chroot-security "https://security.debian.org/debian-security/" \
+  --parent-mirror-binary-security "https://security.debian.org/debian-security/" \
   --apt-indices false \
   --apt-recommends false \
   --firmware-chroot true \
-  --uefi-secure-boot disable \
   --iso-application "Ultimate Linux Installer" \
   --iso-preparer "ULI" \
   --iso-publisher "Ultimate Linux Installer" \
   --iso-volume "ULI_0_1_0"
+
 
 echo "Starting lb build (this can take a long time)..."
 lb build
