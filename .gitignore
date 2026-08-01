@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local extracts / large reference originals (copies live under docs/reference)
+_doc_extract/
+_doc.zip
+_doc_text.txt
+
+# Build artifacts
+live-build/cache/
+live-build/chroot/
+live-build/binary/
+live-build/.build/
+*.iso
+*.img
+*.qcow2
+*.raw
+artifacts/
+downloads/
+.state/
+*.log
+
+# Secrets / runtime
+*.pem
+id_rsa*
+passwords.txt

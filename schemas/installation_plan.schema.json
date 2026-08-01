@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ThomyieD/Ultimate-Linux-Installer/schemas/installation_plan.schema.json",
+  "title": "Ultimate Linux Installer Plan",
+  "type": "object",
+  "required": ["plan_id", "mode", "locale", "disk", "partitions", "distributions", "user", "bootloader"],
+  "additionalProperties": false,
+  "properties": {
+    "plan_id": { "type": "string", "minLength": 8 },
+    "created_at": { "type": "string" },
+    "mode": {
+      "type": "string",
+      "enum": ["simple", "multiboot", "add", "remove"]
+    },
+    "locale": {
+      "type": "object",
+      "required": ["language", "timezone", "keyboard"],
+      "properties": {
+        "language": { "type": "string" },
+        "timezone": { "type": "string" },
+        "keyboard": { "type": "string" }
+      }
+    },
+    "disk": {
+      "type": "object",
+      "required": ["id", "path", "size_bytes", "table", "wipe"],
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "type": "string" },
+        "model": { "type": "string" },
+        "serial": { "type": "string" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "table": { "type": "string", "enum": ["gpt"] },
+        "wipe": { "type": "boolean" }
+      }
+    },
+    "partitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["role", "size_mib"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["esp", "root", "swap", "data"]
+          },
+          "distribution": { "type": "string" },
+          "size_mib": { "type": "integer", "minimum": 1 },
+          "filesystem": {
+            "type": "string",
+            "enum": ["fat32", "ext4", "btrfs", "xfs", "swap"]
+          },
+          "label": { "type": "string" },
+          "partuuid": { "type": ["string", "null"] },
+          "uuid": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "distributions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "variant", "display_name"],
+        "properties": {
+          "id": { "type": "string" },
+          "variant": { "type": "string" },
+          "display_name": { "type": "string" },
+          "release": { "type": ["string", "null"] },
+          "desktop": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["username"],
+      "properties": {
+        "username": { "type": "string", "minLength": 1 },
+        "password_hash": { "type": ["string", "null"] },
+        "ssh_keys": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sudo": { "type": "boolean", "default": true },
+        "disable_password_auth": { "type": "boolean", "default": false }
+      }
+    },
+    "bootloader": {
+      "type": "object",
+      "required": ["kind", "theme", "timeout_seconds"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["grub"] },
+        "theme": { "type": "string" },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "efi_directory": { "type": "string", "default": "UltimateInstaller" }
+      }
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "method": { "type": "string", "enum": ["dhcp", "static", "wifi"] },
+        "ssid": { "type": ["string", "null"] }
+      }
+    },
+    "confirmed": { "type": "boolean", "default": false }
+  }
+}

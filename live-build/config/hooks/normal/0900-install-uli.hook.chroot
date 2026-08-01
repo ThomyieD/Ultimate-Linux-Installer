@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+# Install Ultimate Linux Installer into the live system and autostart the UI
+if [ -d /opt/uli/src ]; then
+  python3 -m pip install --break-system-packages /opt/uli/src || \
+    python3 -m pip install /opt/uli/src || true
+fi
+
+cat >/usr/local/bin/uli-start <<'EOF'
+#!/bin/sh
+export ULI_SIMULATE_DISK=0
+export ULI_DRY_RUN=0
+export QT_QPA_PLATFORM=xcb
+exec uli --lang de
+EOF
+chmod +x /usr/local/bin/uli-start
+
+mkdir -p /etc/xdg/autostart
+cat >/etc/xdg/autostart/uli.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Ultimate Linux Installer
+Exec=/usr/local/bin/uli-start
+X-GNOME-Autostart-enabled=true
+EOF
