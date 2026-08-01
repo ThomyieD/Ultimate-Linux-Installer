@@ -26,12 +26,17 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
-# Local extracts / large reference originals (copies live under docs/reference)
+# Local extracts
 _doc_extract/
 _doc.zip
 _doc_text.txt
 
-# Build artifacts
+# Root-level reference originals (canonical copies under docs/reference)
+/*.png
+/*.jpeg
+/*.docx
+
+# Build artifacts / runtime caches (not the Python package app/uli/downloads)
 live-build/cache/
 live-build/chroot/
 live-build/binary/
@@ -41,8 +46,8 @@ live-build/.build/
 *.qcow2
 *.raw
 artifacts/
-downloads/
-.state/
+/downloads/
+/state/
 *.log
 
 # Secrets / runtime
