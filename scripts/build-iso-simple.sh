@@ -15,9 +15,10 @@ export DEBIAN_FRONTEND=noninteractive
 
 need() { command -v "$1" >/dev/null || { echo "missing: $1" >&2; exit 1; }; }
 need debootstrap
-need squashfs-tools
+need mksquashfs
 need xorriso
 need rsync
+need mkfs.vfat
 
 rm -rf "$WORK"
 mkdir -p "$WORK"/{chroot,image/{live,boot/grub,EFI/BOOT},scratch}
