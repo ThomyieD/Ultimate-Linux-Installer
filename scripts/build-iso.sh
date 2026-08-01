@@ -68,6 +68,7 @@ lb config \
   --firmware-chroot false \
   --firmware-binary false \
   --security false \
+  --memtest none \
   --iso-application "Ultimate Linux Installer" \
   --iso-preparer "ULI" \
   --iso-publisher "Ultimate Linux Installer" \
