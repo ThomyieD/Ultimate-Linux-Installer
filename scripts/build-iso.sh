@@ -10,9 +10,10 @@ fi
 
 chmod +x config/hooks/normal/*.hook.chroot 2>/dev/null || true
 
-# Seed application into chroot include path
-mkdir -p config/includes.chroot/opt/uli
-rsync -a --delete \
+# Never rsync live-build into itself (causes recursive nesting + disk fill)
+rm -rf config/includes.chroot/opt/uli
+mkdir -p config/includes.chroot/opt/uli/src
+rsync -a \
   --exclude '.git' \
   --exclude '.venv' \
   --exclude '_doc_extract' \
@@ -20,13 +21,9 @@ rsync -a --delete \
   --exclude '*.qcow2' \
   --exclude '*.iso' \
   --exclude 'artifacts' \
+  --exclude 'live-build' \
   --exclude 'docs/reference' \
   "$ROOT/" config/includes.chroot/opt/uli/src/
-
-# Avoid carrying a nested live-build tree into the image
-rm -rf config/includes.chroot/opt/uli/src/live-build \
-       config/includes.chroot/opt/uli/src/artifacts \
-       config/includes.chroot/opt/uli/src/.venv || true
 
 lb clean --purge || lb clean || true
 
