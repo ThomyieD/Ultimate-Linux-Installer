@@ -1,51 +1,66 @@
 # Ultimate Linux Installer
 
-Modern, dark-themed UEFI installer for single-disk and multiboot Linux setups.
+Moderne, dunkle UEFI-Installationssoftware für Einzel- und Multiboot-Linux-Systeme.
 
-Boot from USB → graphical installer (not a manual live-desktop workflow) → download from official mirrors → unattended install → central GRUB menu in the style of the target boot screen.
+Vom USB-Stick booten → grafischer Installer (kein manuelles Live-Desktop-Gefrickel) → Download von offiziellen Spiegelservern → unbeaufsichtigte Installation → zentrales GRUB-Menü im Stil des Soll-Zustands.
 
-## Features (MVP)
+> **Deutsch ist die Standardsprache** der Oberfläche. Englisch lässt sich im Installer umschalten.  
+> English documentation: [README.en.md](README.en.md)
 
-- **Modes:** Simple · Multiboot · Add distribution · Remove distribution
-- **Distros:** Debian, Ubuntu (Desktop/Server), Fedora (Workstation/Server), Arch, Proxmox VE (simple only)
-- **UI:** Dark modern Qt UI, German default, English toggle
-- **Storage:** Even split or planned layouts, ESP + roots + optional swap/data; installation USB never offered as target
-- **Bootloader:** One chef GRUB (`EFI/UltimateInstaller`) with themed menu; UEFI Firmware Settings last
-- **Safety nets** from real multiboot pain points:
-  - reclaim UEFI BootOrder after distro installers
-  - stable `/vmlinuz` + `/initrd.img` relative symlinks + update hooks
-  - shared swap `resume=UUID=…` aligned across systems
-  - ensure primary user is in `sudo`/`wheel`
-  - disable wait-online delays where appropriate
-  - resumable install state machine
+## Fertige ISO herunterladen
 
-## Architecture
+Die bootfähige ISO liegt **nicht** im Git-Repository (zu groß, ändert sich mit jedem Release).
+
+Stattdessen:
+
+1. Öffne **[Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases)**
+2. Lade `ultimate-linux-installer-*.iso` herunter
+3. Schreibe sie mit Rufus, balenaEtcher oder `dd` auf einen USB-Stick (GPT + UEFI)
+
+Falls noch kein Release mit ISO existiert, wird gerade die erste gebaut bzw. du kannst sie selbst erzeugen (siehe unten).
+
+## Funktionen (MVP)
+
+- **Modi:** Einfache Installation · Multiboot · Distribution hinzufügen · entfernen
+- **Distributionen:** Debian, Ubuntu (Desktop/Server), Fedora (Workstation/Server), Arch, Proxmox VE (nur Einfach)
+- **Oberfläche:** modernes Dark Theme, Deutsch standardmäßig, Englisch umschaltbar
+- **Speicher:** gleichmäßige Aufteilung oder Plan, ESP + Roots + optional Swap/Daten; Installations-USB nie als Ziel
+- **Bootloader:** ein Chef-GRUB (`EFI/UltimateInstaller`) mit Theme; UEFI-Firmware-Einstellungen zuletzt
+- **Absicherungen** aus dem realen Multiboot-Projekt:
+  - UEFI-BootOrder nach Distro-Installern zurückholen
+  - stabile `/vmlinuz`- und `/initrd.img`-Symlinks inkl. Update-Hooks
+  - gemeinsames Swap mit `resume=UUID=…`
+  - Primärbenutzer in `sudo`/`wheel`
+  - unnötige wait-online-Verzögerungen vermeiden
+  - fortsetzbarer Installationszustand
+
+## Architektur
 
 ```text
-UEFI firmware
-  → USB bootloader
-  → minimal Linux live system
+UEFI-Firmware
+  → Bootloader vom USB-Stick
+  → minimales Linux-Live-System
   → Ultimate Linux Installer (PySide6)
-       ├── network / storage / downloads
-       ├── distro adapters (preseed / autoinstall / kickstart / pacstrap)
-       └── central GRUB + themes
+       ├── Netzwerk / Speicher / Downloads
+       ├── Distro-Adapter (Preseed / Autoinstall / Kickstart / Pacstrap)
+       └── zentraler GRUB + Themes
 ```
 
 Details: [docs/architecture/overview.md](docs/architecture/overview.md)
 
-## Development
+## Entwicklung
 
-### On Linux (recommended: Debian/Ubuntu build host)
+### Linux-Buildhost (empfohlen: Debian/Ubuntu)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-uli --dry-run --lang de          # desktop UI against simulated disks
+uli --dry-run --lang de          # Desktop-UI mit simulierten Festplatten
 pytest
 ```
 
-### Build bootable ISO (Linux host with live-build)
+### ISO selbst bauen (nur für Entwickler)
 
 ```bash
 sudo apt install live-build qemu-system-x86 ovmf xorriso squashfs-tools
@@ -54,29 +69,31 @@ sudo apt install live-build qemu-system-x86 ovmf xorriso squashfs-tools
 ./scripts/run-qemu.sh
 ```
 
-> Destructive partitioning runs only inside the live image with confirmation. Desktop mode is dry-run by default.
+Die ISO landet unter `artifacts/ultimate-linux-installer.iso` und wird für Nutzer über **GitHub Releases** bereitgestellt – nicht committed.
 
-## Repository layout
+> Destruktive Partitionierung läuft nur im Live-Image nach Bestätigung. Desktop-Modus ist standardmäßig Dry-Run.
+
+## Repository-Struktur
 
 ```text
-app/uli/           # Python application (UI + core)
-adapters/          # Per-distribution automation adapters
-themes/grub/       # GRUB themes (uli-lenovo, uli-dark)
-live-build/        # Debian live-build configuration
-schemas/           # Installation plan JSON schema
-scripts/           # ISO + QEMU helpers
-tests/             # Unit / integration / QEMU harnesses
-docs/              # Architecture + reference mockups
+app/uli/           # Python-Anwendung (UI + Kern)
+adapters/          # Automation pro Distribution
+themes/grub/       # GRUB-Themes (uli-lenovo, uli-dark)
+live-build/        # Debian live-build Konfiguration
+schemas/           # JSON-Schema für den Installationsplan
+scripts/           # ISO- und QEMU-Hilfen
+tests/             # Unit- / Integrations- / QEMU-Tests
+docs/              # Architektur + Referenz-Mockups
 ```
 
 ## Status
 
-**0.1.0 – foundation MVP**
+**0.1.0 – Foundation-MVP**
 
-Working today: wizard UI, plan generation, adapters, GRUB rendering, dry-run partitioning commands, state machine, tests.
+Aktuell: Wizard-UI, Plan-Erzeugung, Adapter, GRUB-Rendering, Dry-Run-Partitionierung, State-Machine, Tests.
 
-Next: live ISO polish, real download+verify pipeline, full multi-install orchestration against QEMU, then hardware validation.
+Als Nächstes: Live-ISO feinschleifen, Download+Verify-Pipeline, Multi-Install-Orchestrierung in QEMU, Hardware-Validierung.
 
-## License
+## Lizenz
 
-MIT – see [LICENSE](LICENSE).
+MIT – siehe [LICENSE](LICENSE).

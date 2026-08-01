@@ -1,0 +1,50 @@
+name: Build ISO Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the ISO to (e.g. v0.1.0)"
+        required: false
+        default: ""
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            live-build qemu-utils ovmf xorriso squashfs-tools \
+            python3 python3-pip python3-venv rsync curl
+
+      - name: Generate theme assets
+        run: bash scripts/generate-theme-assets.sh || true
+
+      - name: Build ISO
+        run: |
+          chmod +x scripts/*.sh
+          sudo bash scripts/build-iso.sh
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultimate-linux-installer-iso
+          path: artifacts/*.iso
+          if-no-files-found: error
+
+      - name: Attach ISO to GitHub Release
+        if: github.event_name == 'release' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          ISO=$(ls artifacts/*.iso | head -n1)
+          gh release upload "$TAG" "$ISO" --clobber
