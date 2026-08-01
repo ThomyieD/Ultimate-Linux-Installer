@@ -55,6 +55,7 @@ lb config \
   --apt-indices false \
   --apt-recommends false \
   --firmware-chroot true \
+  --security false \
   --iso-application "Ultimate Linux Installer" \
   --iso-preparer "ULI" \
   --iso-publisher "Ultimate Linux Installer" \
