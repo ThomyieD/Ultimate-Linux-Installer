@@ -12,6 +12,8 @@ license = { text = "MIT" }
 authors = [{ name = "Ultimate Linux Installer contributors" }]
 keywords = ["linux", "installer", "multiboot", "uefi", "grub"]
 dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
   "PySide6>=6.6",
   "PyYAML>=6.0",
   "requests>=2.31",
@@ -35,7 +37,7 @@ uli = "uli.main:main"
 where = ["app"]
 
 [tool.setuptools.package-data]
-uli = ["i18n/*.json", "ui/styles/*.qss"]
+uli = ["i18n/*.json", "ui/styles/*.qss", "ui/fonts/*", "web/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

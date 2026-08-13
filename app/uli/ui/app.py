@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
@@ -11,12 +10,15 @@ from uli.ui.main_window import MainWindow
 
 
 def _load_fonts() -> str:
-    """Prefer a distinctive UI font; fall back gracefully."""
+    fonts_dir = Path(__file__).resolve().parent / "fonts"
+    for path in sorted(fonts_dir.glob("*.ttf")) + sorted(fonts_dir.glob("*.otf")):
+        QFontDatabase.addApplicationFont(str(path))
+
     preferred = [
-        "Segoe UI Variable",
-        "Segoe UI",
-        "IBM Plex Sans",
-        "Source Sans 3",
+        "Plus Jakarta Sans",
+        "SF Pro Text",
+        "SF Pro Display",
+        "Helvetica Neue",
         "Noto Sans",
         "DejaVu Sans",
     ]
@@ -45,7 +47,8 @@ def run_ui(*, language: str = "de", dry_run: bool = True, simulate_disk: bool = 
     app.setApplicationName("Ultimate Linux Installer")
     app.setStyle("Fusion")
     family = _load_fonts()
-    font = QFont(family, 11)
+    font = QFont(family, 12)
+    font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
     app.setFont(font)
     app.setStyleSheet(load_stylesheet())
 

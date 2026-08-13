@@ -54,7 +54,7 @@ class StoragePage(BasePage):
         if not d:
             return
         mins = {a.info.id: a.info.minimum_root_gib for a in [get_adapter(x.id) for x in self.wizard.state.selected]}
-        parts = equal_root_layout(
+        parts, _warnings = equal_root_layout(
             d.size_bytes,
             self.wizard.state.selected,
             include_swap=self.wizard.state.include_swap,

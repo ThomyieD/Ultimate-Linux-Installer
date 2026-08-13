@@ -7,21 +7,23 @@ from uli.i18n import tr
 from uli.ui.pages.base import BasePage
 
 
-class _ModeCard(QFrame):
+class _ModeRow(QFrame):
     def __init__(self, mode_id: str, title_key: str, desc_key: str, parent_page: "ModePage") -> None:
         super().__init__()
         self.mode_id = mode_id
         self.parent_page = parent_page
         self.title_key = title_key
         self.desc_key = desc_key
-        self.setObjectName("ModeCard")
+        self.setObjectName("ModeRow")
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setSpacing(6)
         self.title = QLabel(tr(title_key))
-        self.title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self.title.setStyleSheet("font-size: 17px; font-weight: 600; color: #f5f5f7;")
         self.desc = QLabel(tr(desc_key))
-        self.desc.setObjectName("Subline")
+        self.desc.setObjectName("PageSubtitle")
         self.desc.setWordWrap(True)
         lay.addWidget(self.title)
         lay.addWidget(self.desc)
@@ -43,12 +45,12 @@ class _ModeCard(QFrame):
 class ModePage(BasePage):
     def __init__(self, wizard) -> None:
         super().__init__(wizard)
-        self.set_texts("mode.title")
+        self.set_texts("mode.title", "mode.lead")
         self.cards = [
-            _ModeCard("simple", "mode.simple", "mode.simple.desc", self),
-            _ModeCard("multiboot", "mode.multi", "mode.multi.desc", self),
-            _ModeCard("add", "mode.add", "mode.add.desc", self),
-            _ModeCard("remove", "mode.remove", "mode.remove.desc", self),
+            _ModeRow("simple", "mode.simple", "mode.simple.desc", self),
+            _ModeRow("multiboot", "mode.multi", "mode.multi.desc", self),
+            _ModeRow("add", "mode.add", "mode.add.desc", self),
+            _ModeRow("remove", "mode.remove", "mode.remove.desc", self),
         ]
         for card in self.cards:
             self.root.addWidget(card)

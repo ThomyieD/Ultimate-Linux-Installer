@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Ultimate Linux Installer</title>
+  <link rel="stylesheet" href="/static/styles.css?v=0.2.9" />
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div>
+        <div class="mark">ULI</div>
+        <h1 id="appTitle">Ultimate Linux Installer</h1>
+        <p class="sub" id="appSub"></p>
+      </div>
+      <select class="lang" id="langSelect" aria-label="Language">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+      </select>
+    </header>
+
+    <div class="shell">
+      <aside class="rail">
+        <h2 id="railTitle">Setup</h2>
+        <ol class="steps" id="stepList"></ol>
+      </aside>
+
+      <main class="main" id="main"></main>
+    </div>
+
+    <footer class="footer">
+      <button class="btn ghost" type="button" id="btnBack">Zurück</button>
+      <button class="btn primary" type="button" id="btnNext">Weiter</button>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status">
+    <strong id="toastTitle"></strong>
+    <span id="toastBody"></span>
+  </div>
+
+  <script src="/static/app.js?v=0.2.9"></script>
+</body>
+</html>

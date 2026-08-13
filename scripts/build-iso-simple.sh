@@ -8,8 +8,9 @@ ARCH=amd64
 DIST=jammy
 MIRROR="${ULI_MIRROR:-http://archive.ubuntu.com/ubuntu}"
 OUT_DIR="$ROOT/artifacts"
-OUT_ISO="$OUT_DIR/ultimate-linux-installer-0.1.0-amd64.iso"
-LABEL="ULI_0_1_0"
+VERSION="${ULI_VERSION:-0.1.1}"
+OUT_ISO="$OUT_DIR/ultimate-linux-installer-${VERSION}-amd64.iso"
+LABEL="ULI_${VERSION//./_}"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -50,16 +51,23 @@ trap cleanup EXIT
 
 chroot "$CHROOT" apt-get update
 chroot "$CHROOT" apt-get install -y --no-install-recommends \
-  linux-image-generic live-boot \
+  linux-image-generic live-boot live-config live-config-systemd live-tools \
   systemd-sysv sudo locales \
   network-manager ca-certificates \
-  xorg openbox lightdm lightdm-gtk-greeter dbus-x11 xterm \
+  xorg openbox lightdm lightdm-gtk-greeter dbus-x11 xterm curl \
+  open-vm-tools open-vm-tools-desktop \
+  xserver-xorg-core xserver-xorg-input-libinput \
+  xserver-xorg-video-vesa xserver-xorg-video-fbdev xserver-xorg-video-vmware \
   python3 python3-pip python3-venv python3-yaml python3-requests python3-psutil \
-  libgl1 libglib2.0-0 libxkbcommon0 libxcb-cursor0 libegl1 \
+  libgl1 libglib2.0-0 libxkbcommon0 libxkbcommon-x11-0 libegl1 \
+  libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-xinerama0 \
+  libxcb-xkb1 libxcb-util1 \
   gdisk parted dosfstools e2fsprogs btrfs-progs xfsprogs lvm2 cryptsetup \
   efibootmgr grub-efi-amd64-bin grub-pc-bin shim-signed \
   squashfs-tools rsync curl wget gnupg fonts-dejavu-core \
-  isolinux syslinux-common
+  isolinux syslinux-common policykit-1
+
+echo uli-live >"$CHROOT/etc/hostname"
 
 chroot "$CHROOT" update-initramfs -u || true
 
@@ -71,34 +79,62 @@ rsync -a \
   "$ROOT/" "$CHROOT/opt/uli/src/"
 
 chroot "$CHROOT" python3 -m pip install --no-cache-dir \
-  /opt/uli/src PySide6 PyYAML requests jsonschema psutil || \
+  /opt/uli/src fastapi 'uvicorn[standard]' PyYAML requests jsonschema psutil || \
 chroot "$CHROOT" python3 -m pip install --break-system-packages --no-cache-dir \
-  /opt/uli/src PySide6 PyYAML requests jsonschema psutil
+  /opt/uli/src fastapi 'uvicorn[standard]' PyYAML requests jsonschema psutil
+# PySide6 optional (legacy --ui qt)
+chroot "$CHROOT" python3 -m pip install --no-cache-dir PySide6 2>/dev/null || true
 
 cat >"$CHROOT/usr/local/bin/uli-start" <<'EOF'
 #!/bin/sh
+export PYTHONPATH=/usr/local/lib/python3.10/dist-packages
 export ULI_SIMULATE_DISK=0
 export ULI_DRY_RUN=0
-export QT_QPA_PLATFORM=xcb
-sleep 1
-exec uli --lang de || exec python3 -m uli.main --lang de
+mkdir -p /var/log/uli
+exec >>/var/log/uli/uli-start.log 2>&1
+echo "==== $(date -Is) DISPLAY=$DISPLAY ===="
+
+# Web backend
+uli --ui web --host 127.0.0.1 --port 8787 &
+WEB_PID=$!
+i=0
+while [ "$i" -lt 60 ]; do
+  if curl -sf http://127.0.0.1:8787/api/health >/dev/null 2>&1; then
+    break
+  fi
+  i=$((i + 1))
+  sleep 0.5
+done
+
+# Prefer Firefox kiosk (deb package); fall back to Chromium if present
+if command -v firefox >/dev/null 2>&1; then
+  exec firefox --kiosk --new-instance "http://127.0.0.1:8787/"
+elif command -v chromium-browser >/dev/null 2>&1; then
+  exec chromium-browser --kiosk --no-first-run --disable-infobars \
+    --check-for-update-interval=31536000 "http://127.0.0.1:8787/"
+elif command -v chromium >/dev/null 2>&1; then
+  exec chromium --kiosk --no-first-run --disable-infobars "http://127.0.0.1:8787/"
+fi
+
+echo "No browser found — leaving web UI on :8787 (pid $WEB_PID)"
+wait "$WEB_PID"
 EOF
 chmod +x "$CHROOT/usr/local/bin/uli-start"
 if [ ! -x "$CHROOT/usr/local/bin/uli" ]; then
-  printf '#!/bin/sh\nexec python3 -m uli.main "$@"\n' >"$CHROOT/usr/local/bin/uli"
+  printf '%s\n' '#!/bin/sh' \
+    'export PYTHONPATH=/usr/local/lib/python3.10/dist-packages${PYTHONPATH:+:$PYTHONPATH}' \
+    'exec python3 -m uli.main "$@"' >"$CHROOT/usr/local/bin/uli"
   chmod +x "$CHROOT/usr/local/bin/uli"
 fi
 
-mkdir -p "$CHROOT/etc/xdg/autostart" "$CHROOT/etc/xdg/openbox" "$CHROOT/etc/lightdm"
-cat >"$CHROOT/etc/xdg/autostart/uli.desktop" <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=Ultimate Linux Installer
-Exec=/usr/local/bin/uli-start
-X-GNOME-Autostart-enabled=true
-EOF
+mkdir -p "$CHROOT/etc/xdg/autostart" "$CHROOT/etc/xdg/openbox" "$CHROOT/etc/lightdm" \
+  "$CHROOT/home/uli/.config/openbox" "$CHROOT/var/log/uli"
+rm -f "$CHROOT/etc/xdg/autostart/uli.desktop" "$CHROOT/home/uli/.config/openbox/autostart"
+# Hide Openbox desktop clutter; only launch the web UI
 cat >"$CHROOT/etc/xdg/openbox/autostart" <<'EOF'
 #!/bin/sh
+xset -dpms
+xset s off
 /usr/local/bin/uli-start &
 EOF
 chmod +x "$CHROOT/etc/xdg/openbox/autostart"
@@ -110,8 +146,12 @@ user-session=openbox
 greeter-session=lightdm-gtk-greeter
 EOF
 
-chroot "$CHROOT" useradd -m -G sudo,audio,video,netdev -s /bin/bash uli || true
+chroot "$CHROOT" groupadd -f autologin
+chroot "$CHROOT" groupadd -f nopasswdlogin
+chroot "$CHROOT" useradd -m -G sudo,audio,video,netdev,autologin,nopasswdlogin -s /bin/bash uli || \
+  chroot "$CHROOT" usermod -aG sudo,audio,video,netdev,autologin,nopasswdlogin uli || true
 echo 'uli:uli' | chroot "$CHROOT" chpasswd
+chroot "$CHROOT" chown -R uli:uli /home/uli /var/log/uli
 chroot "$CHROOT" systemctl enable NetworkManager.service || true
 chroot "$CHROOT" systemctl enable lightdm.service || true
 
@@ -145,7 +185,7 @@ fi
 cat >"$IMG/isolinux/isolinux.cfg" <<'EOF'
 UI menu.c32
 PROMPT 0
-TIMEOUT 30
+TIMEOUT 1
 DEFAULT uli
 LABEL uli
   MENU LABEL Ultimate Linux Installer
@@ -153,54 +193,34 @@ LABEL uli
   APPEND initrd=/live/initrd.img boot=live components quiet splash hostname=uli-live username=uli
 EOF
 
-# UEFI GRUB
+# UEFI GRUB (must succeed — never ship BIOS-only)
+# shellcheck source=lib-iso-uefi.sh
+source "$ROOT/scripts/lib-iso-uefi.sh"
+
 cat >"$IMG/boot/grub/grub.cfg" <<'EOF'
-set timeout=5
+set timeout=0
+set timeout_style=hidden
 set default=0
+insmod all_video
+insmod linux
+insmod linuxefi
 menuentry "Ultimate Linux Installer" {
-    linux /live/vmlinuz boot=live components quiet splash hostname=uli-live username=uli
+    linux /live/vmlinuz boot=live components quiet splash hostname=uli-live username=uli console=tty0
     initrd /live/initrd.img
 }
 EOF
 
-# Create EFI boot image
+GRUB_EFI_DIR="$(uli_find_grub_efi_dir "$CHROOT")" || {
+  echo "ERROR: install grub-efi-amd64-bin in chroot/host before building" >&2
+  exit 1
+}
 BOOT_IMG="$WORK/scratch/efi.img"
-dd if=/dev/zero of="$BOOT_IMG" bs=1M count=10 status=none
-mkfs.vfat "$BOOT_IMG" >/dev/null
-mkdir -p "$WORK/scratch/efimount"
-mount "$BOOT_IMG" "$WORK/scratch/efimount"
-mkdir -p "$WORK/scratch/efimount/EFI/BOOT"
-if [ -f "$CHROOT/usr/lib/shim/shimx64.efi.signed.latest" ]; then
-  cp "$CHROOT/usr/lib/shim/shimx64.efi.signed.latest" "$WORK/scratch/efimount/EFI/BOOT/BOOTX64.EFI"
-elif [ -f "$CHROOT/usr/lib/shim/shimx64.efi.signed" ]; then
-  cp "$CHROOT/usr/lib/shim/shimx64.efi.signed" "$WORK/scratch/efimount/EFI/BOOT/BOOTX64.EFI"
-elif [ -f /usr/lib/shim/shimx64.efi.signed ]; then
-  cp /usr/lib/shim/shimx64.efi.signed "$WORK/scratch/efimount/EFI/BOOT/BOOTX64.EFI"
-else
-  # Fallback: grub efi only
-  grub-mkimage -O x86_64-efi -o "$WORK/scratch/efimount/EFI/BOOT/BOOTX64.EFI" \
-    -p /boot/grub iso9660 fat part_gpt part_msdos normal linux search search_fs_uuid search_label configfile echo ls || true
-fi
-cp "$IMG/boot/grub/grub.cfg" "$WORK/scratch/efimount/EFI/BOOT/grub.cfg" 2>/dev/null || true
-umount "$WORK/scratch/efimount"
+uli_make_efi_boot_image "$BOOT_IMG" "$IMG" "$LABEL" "$GRUB_EFI_DIR"
 cp "$BOOT_IMG" "$IMG/EFI/BOOT/efiboot.img"
-cp -r "$WORK/scratch/efimount/EFI/BOOT/." "$IMG/EFI/BOOT/" 2>/dev/null || true
 
 echo "[6/6] create hybrid ISO..."
 mkdir -p "$OUT_DIR"
-xorriso -as mkisofs \
-  -iso-level 3 \
-  -full-iso9660-filenames \
-  -volid "$LABEL" \
-  -eltorito-boot isolinux/isolinux.bin \
-  -eltorito-catalog isolinux/boot.cat \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -eltorito-alt-boot \
-  -e EFI/BOOT/efiboot.img \
-  -no-emul-boot \
-  -isohybrid-gpt-basdat \
-  -output "$OUT_ISO" \
-  "$IMG"
+uli_xorriso_hybrid "$OUT_ISO" "$LABEL" "$IMG"
 
 ln -sfn "$(basename "$OUT_ISO")" "$OUT_DIR/ultimate-linux-installer.iso"
 ls -lh "$OUT_ISO"

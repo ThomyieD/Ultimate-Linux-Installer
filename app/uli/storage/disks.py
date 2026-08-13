@@ -82,7 +82,7 @@ def list_candidate_disks(*, include_removable: bool = False) -> list[DiskInfo]:
         # Skip obvious installation medium / loop / small devices
         if path in medium_sources or any(path.startswith(m) for m in medium_sources if m.startswith("/dev/")):
             continue
-        if size < 16 * 1024**3:
+        if size < 8 * 1024**3:
             continue
         if is_usb and not include_removable:
             continue
@@ -126,8 +126,7 @@ def simulated_disks() -> list[DiskInfo]:
 
 def get_disks(*, simulate: bool | None = None) -> list[DiskInfo]:
     if simulate is None:
-        simulate = os.environ.get("ULI_SIMULATE_DISK", "1") == "1"
+        simulate = os.environ.get("ULI_SIMULATE_DISK", "0") == "1"
     if simulate:
         return simulated_disks()
-    real = list_candidate_disks()
-    return real or simulated_disks()
+    return list_candidate_disks()

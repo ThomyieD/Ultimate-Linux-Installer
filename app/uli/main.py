@@ -7,6 +7,23 @@ import sys
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="uli", description="Ultimate Linux Installer")
     parser.add_argument(
+        "--ui",
+        choices=("web", "qt"),
+        default="web",
+        help="User interface (default: web)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Web UI bind host (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8787,
+        help="Web UI port (default: 8787)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Never perform destructive disk operations",
@@ -14,8 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--simulate-disk",
         action="store_true",
-        default=True,
-        help="Use simulated disks when not running from the live ISO (default)",
+        default=False,
+        help="Use simulated disks (for desktop testing without real disks)",
     )
     parser.add_argument(
         "--lang",
@@ -37,9 +54,28 @@ def main(argv: list[str] | None = None) -> int:
         print(plan.to_yaml())
         return 0
 
-    from uli.ui.app import run_ui
+    if args.ui == "qt":
+        from uli.i18n import set_language
+        from uli.ui.app import run_ui
 
-    return run_ui(language=args.lang, dry_run=args.dry_run, simulate_disk=args.simulate_disk)
+        set_language(args.lang)
+        return run_ui(
+            language=args.lang,
+            dry_run=args.dry_run,
+            simulate_disk=args.simulate_disk,
+        )
+
+    from uli.i18n import set_language
+    from uli.web.server import run_server
+
+    set_language(args.lang)
+    run_server(
+        host=args.host,
+        port=args.port,
+        dry_run=args.dry_run,
+        simulate_disk=args.simulate_disk,
+    )
+    return 0
 
 
 if __name__ == "__main__":

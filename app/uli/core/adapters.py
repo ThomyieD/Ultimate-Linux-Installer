@@ -62,10 +62,21 @@ def ensure_builtin_adapters() -> None:
     import sys
     from pathlib import Path
 
-    # Repo root so `adapters.*` imports work in editable and live installs
-    repo_root = Path(__file__).resolve().parents[3]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
+    # Dev: <repo>/app/uli/core → parents[3] = repo root
+    # Live: .../dist-packages/uli/core → parents[2] = dist-packages (adapters beside uli)
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parents[3],
+        here.parents[2],
+        Path("/usr/local/share/uli"),
+        Path("/opt/uli"),
+    ]
+    root = next((p for p in candidates if (p / "adapters" / "__init__.py").is_file()), None)
+    if root is None:
+        raise RuntimeError("adapters package not found on sys.path candidates")
+    path = str(root)
+    if path not in sys.path:
+        sys.path.insert(0, path)
     for module in (
         "adapters.debian",
         "adapters.ubuntu",

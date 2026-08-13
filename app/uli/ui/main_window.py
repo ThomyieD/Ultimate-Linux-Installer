@@ -7,14 +7,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from uli.i18n import get_language, set_language, tr
+from uli.i18n import set_language, tr
 from uli.ui.pages.download import DownloadPage
 from uli.ui.pages.done import DonePage
 from uli.ui.pages.distros import DistrosPage
@@ -25,6 +24,7 @@ from uli.ui.pages.progress import ProgressPage
 from uli.ui.pages.settings import SettingsPage
 from uli.ui.pages.storage import StoragePage
 from uli.ui.state import WizardState
+from uli.ui.widgets.notice import show_notice
 
 
 class MainWindow(QMainWindow):
@@ -34,44 +34,49 @@ class MainWindow(QMainWindow):
         self.simulate_disk = simulate_disk
         self.state = WizardState(language=language)
         self.setWindowTitle(tr("app.title"))
-        self.resize(1100, 720)
-        self.setMinimumSize(960, 640)
+        self.resize(1180, 760)
+        self.setMinimumSize(980, 680)
 
         root = QWidget()
         root.setObjectName("CentralRoot")
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(28, 24, 28, 0)
-        layout.setSpacing(18)
+        layout.setContentsMargins(40, 32, 40, 0)
+        layout.setSpacing(0)
 
         header = QHBoxLayout()
-        brand = QLabel("ULI")
-        brand.setObjectName("Brand")
-        titles = QVBoxLayout()
+        header.setSpacing(20)
+        brand_col = QVBoxLayout()
+        brand_col.setSpacing(6)
+        self.brand = QLabel("ULI")
+        self.brand.setObjectName("BrandMark")
         self.headline = QLabel(tr("app.title"))
-        self.headline.setObjectName("Headline")
+        self.headline.setObjectName("AppTitle")
         self.subline = QLabel(tr("app.subtitle"))
-        self.subline.setObjectName("Subline")
-        titles.addWidget(self.headline)
-        titles.addWidget(self.subline)
-        header.addWidget(brand, 0, Qt.AlignmentFlag.AlignTop)
-        header.addSpacing(16)
-        header.addLayout(titles, 1)
+        self.subline.setObjectName("AppSubtitle")
+        self.subline.setWordWrap(True)
+        brand_col.addWidget(self.brand)
+        brand_col.addWidget(self.headline)
+        brand_col.addWidget(self.subline)
+        header.addLayout(brand_col, 1)
 
         self.lang = QComboBox()
+        self.lang.setMinimumWidth(140)
         self.lang.addItem(tr("lang.de"), "de")
         self.lang.addItem(tr("lang.en"), "en")
         self.lang.setCurrentIndex(0 if language == "de" else 1)
         self.lang.currentIndexChanged.connect(self._on_language)
         header.addWidget(self.lang, 0, Qt.AlignmentFlag.AlignTop)
         layout.addLayout(header)
+        layout.addSpacing(28)
 
-        body = QHBoxLayout()
+        line = QFrame()
+        line.setObjectName("Hairline")
+        layout.addWidget(line)
+        layout.addSpacing(28)
+
         self.stack = QStackedWidget()
-        self.badge = QLabel("1")
-        self.badge.setObjectName("StepBadge")
-        self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
+        self.stack.setObjectName("ContentPane")
         self.pages = [
             NetworkPage(self),
             ModePage(self),
@@ -85,15 +90,12 @@ class MainWindow(QMainWindow):
         ]
         for page in self.pages:
             self.stack.addWidget(page)
-
-        body.addWidget(self.stack, 1)
-        body.addWidget(self.badge, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addLayout(body, 1)
+        layout.addWidget(self.stack, 1)
 
         footer = QFrame()
         footer.setObjectName("Footer")
         fl = QHBoxLayout(footer)
-        fl.setContentsMargins(28, 16, 28, 16)
+        fl.setContentsMargins(40, 18, 40, 18)
         self.btn_back = QPushButton(tr("nav.back"))
         self.btn_back.setObjectName("Ghost")
         self.btn_next = QPushButton(tr("nav.next"))
@@ -120,7 +122,6 @@ class MainWindow(QMainWindow):
         self.headline.setText(tr("app.title"))
         self.subline.setText(tr("app.subtitle"))
         self.btn_back.setText(tr("nav.back"))
-        # refresh lang combo labels without resetting selection
         idx = self.lang.currentIndex()
         self.lang.blockSignals(True)
         self.lang.clear()
@@ -148,7 +149,6 @@ class MainWindow(QMainWindow):
         self._flow_pos = pos
         page_index = self._flow[pos]
         self.stack.setCurrentIndex(page_index)
-        self.badge.setText(str(pos + 1))
         page = self.pages[page_index]
         page.on_enter()
         self._update_nav_labels()
@@ -162,12 +162,11 @@ class MainWindow(QMainWindow):
         page = self.pages[self.stack.currentIndex()]
         ok, message = page.validate()
         if not ok:
-            QMessageBox.warning(self, tr("app.title"), message)
+            show_notice(self, title=tr("dialog.attention"), body=message)
             return
         page.on_leave()
         if self.stack.currentIndex() == 1:
             self._rebuild_flow()
-            # re-find mode page position
             self._flow_pos = self._flow.index(1)
         if self._flow_pos >= len(self._flow) - 1:
             return

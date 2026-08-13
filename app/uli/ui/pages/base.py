@@ -10,14 +10,16 @@ class BasePage(QWidget):
         super().__init__()
         self.wizard = wizard
         self._title = QLabel()
-        self._title.setObjectName("Headline")
+        self._title.setObjectName("PageTitle")
         self._sub = QLabel()
-        self._sub.setObjectName("Subline")
+        self._sub.setObjectName("PageSubtitle")
         self._sub.setWordWrap(True)
         self.root = QVBoxLayout(self)
-        self.root.setSpacing(16)
+        self.root.setContentsMargins(0, 8, 0, 0)
+        self.root.setSpacing(10)
         self.root.addWidget(self._title)
         self.root.addWidget(self._sub)
+        self.root.addSpacing(8)
 
     def set_texts(self, title_key: str, sub_key: str | None = None) -> None:
         self._title_key = title_key
