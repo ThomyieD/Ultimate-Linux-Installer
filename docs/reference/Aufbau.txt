@@ -1,0 +1,655 @@
+**Vorher unbedingt Git als Sicherheitsnetz nutzen**: sauberer Commit + Remote-Push, bevor zwei Agenten auf demselben Projekt arbeiten. Ich würde Codex und Cursor außerdem **niemals gleichzeitig im selben Working Tree schreiben lassen**.
+
+Für deinen Test würde ich es zunächst **bewusst simpel und manuell** aufbauen. Kein eigenes Multi-Agent-Framework. Wenn sich der Ansatz bewährt, können wir den Ablauf später mit einem kleinen Script automatisieren.
+
+## Mein Aufbau
+
+```text
+                         DU
+                          ¦
+                          ?
+                  +---------------+
+                  ¦ Codex / Sol   ¦
+                  ¦     High      ¦
+                  ¦               ¦
+                  ¦ Lead Engineer ¦
+                  +---------------+
+                          ¦
+               plant Architektur
+               zerlegt in Tasks
+               definiert Tests
+                          ¦
+                          ?
+              +--------------------+
+              ¦    TASK-001.md     ¦
+              ¦    TASK-002.md     ¦
+              ¦    TASK-003.md     ¦
+              +--------------------+
+                        ¦
+                        ?
+                  +-----------+
+                  ¦  Cursor   ¦
+                  ¦   Agent   ¦
+                  ¦           ¦
+                  ¦ Entwickler¦
+                  +-----------+
+                        ¦
+                 implementiert
+                 testet
+                 debuggt
+                        ¦
+                        ?
+                    Git Diff
+                        ¦
+                        ?
+                  +-----------+
+                  ¦ Codex Sol ¦
+                  ¦   High    ¦
+                  ¦  REVIEW   ¦
+                  +-----------+
+                        ¦
+               +-----------------+
+               ¦                 ¦
+              OK              Mängel
+               ¦                 ¦
+            Commit          Cursor Fix
+               ¦                 ¦
+               +-----------?-----+
+```
+
+Das passt sehr gut zu den vorhandenen Funktionen: Codex hat einen eigenen `/review`-Workflow und Cursor kann als CLI-Agent direkt Dateien ändern und Commands/Tests ausführen. ([OpenAI Developers][1])
+
+---
+
+# 1. Beide Agenten bekommen dieselben Grundregeln
+
+Das Praktische ist: **Codex und Cursor verstehen beide `AGENTS.md`.** ([developers.openai.com][2])
+
+Ich würde dein Repository deshalb ungefähr so aufbauen:
+
+```text
+mein-projekt/
+¦
++-- AGENTS.md
+¦
++-- README.md
+¦
++-- docs/
+¦   +-- ARCHITECTURE.md
+¦   +-- DATABASE.md
+¦   +-- API.md
+¦   +-- DECISIONS.md
+¦
++-- ai/
+¦   +-- ROADMAP.md
+¦   ¦
+¦   +-- tasks/
+¦   ¦   +-- TASK-001.md
+¦   ¦   +-- TASK-002.md
+¦   ¦   +-- TASK-003.md
+¦   ¦
+¦   +-- reviews/
+¦       +-- TASK-001.md
+¦       +-- TASK-002.md
+¦
++-- scripts/
+¦   +-- check.sh
+¦
++-- src/
+```
+
+`AGENTS.md` ist dabei die gemeinsame Verfassung.
+
+Zum Beispiel:
+
+```md
+# Project Rules
+
+## Canonical documentation
+
+The following files define the architecture and must be respected:
+
+- docs/ARCHITECTURE.md
+- docs/DATABASE.md
+- docs/API.md
+- docs/DECISIONS.md
+
+Implementation agents must not change architectural decisions on their own.
+
+## Task workflow
+
+All implementation work must correspond to exactly one file in:
+
+ai/tasks/
+
+Only implement the scope defined in the active task.
+
+Do not implement future tasks opportunistically.
+
+## Dependencies
+
+Do not introduce new production dependencies unless explicitly allowed by
+the current task.
+
+## Existing code
+
+Prefer existing abstractions and patterns over introducing alternatives.
+
+Do not duplicate functionality that already exists.
+
+## Testing
+
+After implementation run:
+
+./scripts/check.sh
+
+A task is not complete while tests, linting or type checks fail.
+
+Do not weaken or delete tests just to make the task pass.
+
+## Scope
+
+Avoid unrelated refactoring.
+
+Do not silently modify public interfaces, database schemas or APIs unless
+the active task explicitly requires it.
+
+## Git
+
+Keep changes focused on the active task.
+
+Never rewrite Git history.
+
+Never force-push.
+
+## Problems
+
+If the task conflicts with the architecture or required information is
+missing, stop instead of inventing a new architecture.
+```
+
+Das ist wichtig, weil die „dümmere“ KI dann viel weniger Entscheidungen selbst treffen muss.
+
+---
+
+# 2. Sol High macht zuerst die eigentliche Denkarbeit
+
+Codex startest du im Projekt.
+
+Dann bekommt Sol High beispielsweise:
+
+```text
+Du bist der Lead Software Architect dieses Projekts.
+
+Lies zunächst vollständig:
+
+AGENTS.md
+README.md
+docs/
+und den relevanten bestehenden Sourcecode.
+
+Deine Aufgabe ist aktuell NICHT die Implementierung.
+
+Analysiere das Gesamtprojekt und entwickle eine konsistente Architektur.
+
+Erstelle bzw. aktualisiere:
+
+docs/ARCHITECTURE.md
+docs/DATABASE.md
+docs/API.md
+docs/DECISIONS.md
+ai/ROADMAP.md
+
+Zerlege anschließend die Umsetzung in kleine, möglichst unabhängige Tasks
+unter ai/tasks/.
+
+Jeder Task muss enthalten:
+
+- Ziel
+- Ausgangssituation
+- Abhängigkeiten zu vorherigen Tasks
+- konkreter Scope
+- explizit Nicht-Scope
+- Architekturvorgaben
+- erwartetes Verhalten
+- Akzeptanzkriterien
+- notwendige Tests
+- Definition of Done
+
+Ein Implementierungsagent soll den Task anschließend ohne eigene
+Architekturentscheidungen umsetzen können.
+
+Implementiere selbst keinen Anwendungscode.
+```
+
+Das ist genau die Stelle, an der ich **Sol High** verwenden würde.
+
+Sol darf ruhig eine halbe Stunde über die Architektur grübeln, solange daraus 50 sauber definierte Tasks entstehen.
+
+Das ist viel günstiger, als wenn Sol anschließend 50 Tasks selbst implementiert.
+
+---
+
+# 3. Ganz wichtig: Tasks klein schneiden
+
+Nicht:
+
+```text
+TASK-007
+
+Baue das Inventarsystem.
+```
+
+Das wäre für Cursor immer noch zu offen.
+
+Sondern eher:
+
+```text
+TASK-007 - Inventory Database Model
+
+Ziel:
+Persistentes Inventarmodell implementieren.
+
+Voraussetzungen:
+TASK-003 Database Layer abgeschlossen.
+
+Scope:
+- Tabelle inventory
+- Tabelle inventory_items
+- Repository
+- Migration
+- Unit Tests
+
+Nicht Scope:
+- UI
+- Item-Nutzung
+- Drag & Drop
+- Shops
+- Fahrzeug-Inventar
+
+Architektur:
+Siehe docs/DATABASE.md Abschnitt 4.2.
+
+Akzeptanzkriterien:
+1. Ein Character kann genau ein Inventory besitzen.
+2. Inventory unterstützt n Items.
+3. Stackgröße darf max_stack nicht überschreiten.
+4. Ungültige item_id wird abgelehnt.
+5. Migration funktioniert auf leerer DB.
+
+Tests:
+npm test -- inventory
+
+Definition of Done:
+- Tests grün
+- Typecheck grün
+- Lint grün
+```
+
+Dann braucht Cursor viel weniger Intelligenz.
+
+Das ist der eigentliche Trick.
+
+**Sol denkt. Cursor tippt.**
+
+---
+
+# 4. Cursor direkt auf dem DevServer laufen lassen
+
+Das würde ich sogar dem Umweg über deinen Desktop-Cursor vorziehen.
+
+Cursor hat inzwischen eine eigene Agent-CLI, die direkt im Terminal arbeiten kann. Sie kann interaktiv oder automatisiert laufen. ([Cursor Documentation][3])
+
+Auf dem DevServer also ebenfalls Cursor CLI installieren.
+
+Dann:
+
+```bash
+cd /pfad/zum/projekt
+cursor-agent
+```
+
+Je nach aktueller CLI-Version wird der Befehl in der neueren Doku auch als `agent` geführt.
+
+Dann beispielsweise:
+
+```text
+Lies AGENTS.md und ai/tasks/TASK-007.md vollständig.
+
+Implementiere ausschließlich TASK-007.
+
+Halte dich an die vorhandene Architektur und ändere keine
+Architekturentscheidungen.
+
+Führe anschließend alle im Task genannten Tests sowie
+./scripts/check.sh aus.
+
+Behebe auftretende Implementierungsfehler selbstständig.
+
+Wenn der Task nicht eindeutig mit der bestehenden Architektur umgesetzt
+werden kann, stoppe und beschreibe den Blocker, statt eine neue
+Architekturentscheidung zu treffen.
+```
+
+Und dann darf Cursor arbeiten.
+
+---
+
+# 5. Cursor ruhig die langweilige Arbeit machen lassen
+
+Das ist genau der Bereich, bei dem du Sol-Tokens sparen möchtest:
+
+```text
+Cursor
+
+liest TASK-007
+    ?
+erstellt Migration
+    ?
+erstellt Model
+    ?
+erstellt Repository
+    ?
+erstellt Tests
+    ?
+npm test
+    ?
+Fehler
+    ?
+analysiert Fehler
+    ?
+Code ändern
+    ?
+npm test
+    ?
+Fehler
+    ?
+weiter debuggen
+    ?
+alle Tests grün
+```
+
+Wenn Cursor dafür 90 Minuten und 500 Agentenschritte braucht:
+
+**egal.**
+
+Das soll eben **nicht Sol machen**.
+
+---
+
+# 6. Dann kommt Sol High als Reviewer
+
+Nachdem Cursor fertig ist:
+
+```bash
+git status
+git diff
+```
+
+Aber noch **nicht direkt mergen/committen**, zumindest beim ersten Versuch.
+
+Jetzt Codex starten und:
+
+```text
+/review
+```
+
+Codex unterstützt explizit Reviews von:
+
+* uncommitted Changes
+* einzelnen Commits
+* Änderungen gegenüber einem Base-Branch
+* Änderungen mit eigenen Review-Regeln. ([OpenAI Developers][1])
+
+Ich würde Sol zusätzlich sagen:
+
+```text
+Reviewe die Implementierung von TASK-007.
+
+Lies:
+
+AGENTS.md
+ai/tasks/TASK-007.md
+docs/ARCHITECTURE.md
+docs/DATABASE.md
+
+Prüfe insbesondere:
+
+- Erfüllt die Implementierung wirklich alle Akzeptanzkriterien?
+- Wurde unnötig außerhalb des Task-Scopes geändert?
+- Gibt es Architekturverletzungen?
+- Gibt es Race Conditions oder Edge Cases?
+- Gibt es Sicherheitsprobleme?
+- Gibt es fehlerhafte Fehlerbehandlung?
+- Sind die Tests ausreichend?
+- Wurden bestehende Abstraktionen umgangen oder dupliziert?
+
+WICHTIG:
+Ändere den Code NICHT selbst.
+
+Wenn Änderungen notwendig sind, schreibe konkrete Anweisungen für den
+Implementierungsagenten nach:
+
+ai/reviews/TASK-007.md
+```
+
+Das letzte Stück ist für mich besonders wichtig:
+
+### Sol repariert den Fehler NICHT.
+
+Sonst passiert wieder:
+
+```text
+Sol findet Problem
+?
+Sol repariert
+?
+Tests schlagen fehl
+?
+Sol debuggt
+?
+Sol findet Folgeproblem
+?
+30 Minuten High Tokens weg
+```
+
+Stattdessen:
+
+```text
+Sol:
+"Zeile 187 verletzt Architekturregel X."
+
+                    ?
+
+Cursor:
+repariert Zeile 187
+testet
+debuggt
+```
+
+---
+
+# 7. Cursor bekommt die Review-Datei
+
+Danach:
+
+```text
+Lies:
+
+ai/tasks/TASK-007.md
+ai/reviews/TASK-007.md
+
+Behebe sämtliche bestätigten Review-Punkte.
+
+Verändere ausschließlich die dafür notwendigen Dateien.
+
+Führe anschließend erneut alle Tests und ./scripts/check.sh aus.
+```
+
+Dann wieder Codex Review.
+
+Im Idealfall:
+
+```text
+Cursor Implementierung
+       ?
+Sol Review #1
+       ?
+Cursor Fix
+       ?
+Sol Review #2
+       ?
+OK
+       ?
+Commit
+```
+
+---
+
+# 8. Erst dann Commit
+
+```bash
+git add .
+git commit -m "feat: implement TASK-007 inventory persistence"
+```
+
+und:
+
+```bash
+git push
+```
+
+Dann:
+
+```text
+TASK-008
+```
+
+---
+
+# Noch besser: unterschiedliche Git-Worktrees
+
+Sobald der Test funktioniert, würde ich noch einen Schritt weitergehen.
+
+Cursor unterstützt explizit **Git Worktrees für Agent-Aufgaben**. ([Cursor][4])
+
+Dann hast du:
+
+```text
+/project
+¦
+¦  main
+¦  Codex schaut hier
+¦
++------------------------------
+
+~/.cursor/worktrees/project/task-007
+¦
+¦  Cursor arbeitet hier
+¦
++------------------------------
+```
+
+Cursor kann beispielsweise mit:
+
+```bash
+agent --worktree task-007 "Implementiere ai/tasks/TASK-007.md"
+```
+
+einen eigenen Arbeitsbereich bekommen. ([Cursor][4])
+
+Das ist später genial, weil du sogar sagen könntest:
+
+```text
+Cursor Agent A ? TASK-021 Backend
+Cursor Agent B ? TASK-022 Frontend
+Cursor Agent C ? TASK-023 Tests
+```
+
+parallel.
+
+Sol prüft anschließend die Branches.
+
+---
+
+# Ich würde aber zunächst NICHT parallelisieren
+
+Erst einmal testen:
+
+```text
+Sol Plan
+   ?
+Task 001
+   ?
+Cursor
+   ?
+Sol Review
+   ?
+Cursor Fix
+   ?
+Merge
+   ?
+Task 002
+```
+
+Wenn du nach zehn Tasks feststellst:
+
+> Das funktioniert erstaunlich zuverlässig.
+
+dann automatisieren.
+
+---
+
+# Phase 2 könnte dann fast vollständig automatisch laufen
+
+Cursor unterstützt einen **non-interactive/headless Mode**. Dabei kann der Agent aus Scripts heraus gestartet werden und mit Schreibrechten arbeiten. ([Cursor Documentation][5])
+
+Beispielsweise grundsätzlich:
+
+```bash
+cursor-agent -p --force \
+  "Read AGENTS.md and ai/tasks/TASK-007.md. Implement the task completely. Run ./scripts/check.sh."
+```
+
+Dann könnten wir irgendwann einen Controller bauen:
+
+```text
+                     orchestrator.sh
+                            ¦
+                    nächste Task lesen
+                            ¦
+                            ?
+                    Cursor starten
+                            ¦
+                      Implementierung
+                            ¦
+                      Tests bestanden?
+                       ¦          ¦
+                      nein       ja
+                       ¦          ¦
+                    Cursor        ?
+                     Fix      Codex Review
+                                  ¦
+                       +--------------------+
+                       ¦                    ¦
+                      FAIL                  OK
+                       ¦                    ¦
+                       ?                    ?
+                    Cursor Fix            Commit
+                       ¦                    ¦
+                       +-------------? nächste Task
+```
+
+Damit wären wir schon ziemlich nah an einem eigenen **Lead-Agent/Worker-Agent-System**.
+
+OpenAI dokumentiert inzwischen selbst Multi-Agent-Workflows mit Codex als orchestrierbarem Agenten über MCP; das Grundprinzip ist also keineswegs exotisch. ([OpenAI Developers][6])
+
+---
+
+
+[1]: https://developers.openai.com/codex/learn/best-practices?utm_source=chatgpt.com "Best practices"
+[2]: https://developers.openai.com/codex/agent-configuration/agents-md?utm_source=chatgpt.com "Custom instructions with AGENTS.md"
+[3]: https://docs.cursor.com/en/cli/overview?utm_source=chatgpt.com "Cursor – Overview"
+[4]: https://prod.cursor.com/docs/cli/using?utm_source=chatgpt.com "Using Agent in CLI | Cursor Docs"
+[5]: https://docs.cursor.com/en/cli/headless?utm_source=chatgpt.com "Cursor – Using Headless Mode"
+[6]: https://developers.openai.com/codex/mcp-server?utm_source=chatgpt.com "MCP Server - Use Codex with the Agents SDK"
