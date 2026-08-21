@@ -41,7 +41,7 @@ from uli.core.plan import (
     UserConfig,
 )
 from uli.i18n import set_language
-from uli.install.job import get_job, start_install
+from uli.install.job import get_install_log_path, get_job, start_install
 from uli.install.provision import (
     RESERVED_SYSTEM_USERNAMES,
     SUPPORTED_KEYBOARDS,
@@ -65,7 +65,7 @@ from uli.security.secrets import (
     validate_ssh_public_key,
 )
 from uli.storage.disks import get_disks
-from uli.storage.layout import DiskInfo, custom_root_layout, equal_root_layout
+from uli.storage.layout import DiskInfo, DiskTooSmallError, custom_root_layout, equal_root_layout
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 _USERNAME = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
@@ -147,7 +147,7 @@ def _default_wizard(language: str) -> dict[str, Any]:
         "disk_id": "",
         "include_swap": True,
         "swap_size_mib": 8192,
-        "include_data": True,
+        "include_data": False,
         "data_size_mib": 65536,
         "partition_strategy": "equal",
         "root_sizes_mib": {},
@@ -753,6 +753,17 @@ def create_app(
             else:
                 try:
                     plan, warnings = _build_plan(app.state.wizard, disk)
+                except DiskTooSmallError as exc:
+                    return {
+                        "disk": _disk_public(disk),
+                        "partitions": [],
+                        "warnings": [],
+                        "error": exc.code,
+                        "error_code": exc.code,
+                        "required_mib": exc.required_mib,
+                        "available_mib": exc.available_mib,
+                        "plan_fingerprint": "",
+                    }
                 except (TypeError, ValueError) as exc:
                     return {
                         "disk": _disk_public(disk),
@@ -859,6 +870,18 @@ def create_app(
     @app.get("/api/install/status")
     def install_status() -> dict[str, Any]:
         return get_job()
+
+    @app.get("/api/install/log")
+    def install_log_download() -> FileResponse:
+        path = get_install_log_path()
+        if path is None:
+            raise HTTPException(404, "install_log_unavailable")
+        return FileResponse(
+            path,
+            media_type="text/plain; charset=utf-8",
+            filename="install.log",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.post("/api/system/reboot")
     def system_reboot() -> dict[str, Any]:

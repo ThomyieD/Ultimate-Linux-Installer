@@ -72,8 +72,8 @@ deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://deb.debia
 deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://security.debian.org/debian-security trixie-security main contrib non-free-firmware
 """,
     base_packages=("firmware-linux",),
-    server_packages=("task-standard",),
-    desktop_packages=("task-standard", "task-gnome-desktop"),
+    server_packages=("tasksel",),
+    desktop_packages=("tasksel", "task-gnome-desktop"),
 )
 
 _UBUNTU = _DistroSpec(
@@ -538,6 +538,13 @@ class Provisioner:
             chroot=root,
             env=_APT_ENV,
         )
+        if spec.distro_id == "debian":
+            # Debian's "standard" task is a tasksel priority profile, not a package.
+            self.runner.run(
+                ("tasksel", "install", "standard"),
+                chroot=root,
+                env=_APT_ENV,
+            )
 
         locale = self.plan.locale.language
         self._write(root, "/etc/locale.gen", f"{locale} UTF-8\n", mode="0644")
@@ -824,6 +831,39 @@ def provision_plan(
         progress=progress,
         log=log,
     ).provision_all()
+
+
+def apt_package_names(selection: DistroSelection, plan: InstallationPlan) -> tuple[str, ...]:
+    """Return the named APT packages installed for a selection (excluding tasksel tasks)."""
+
+    spec = _spec_for(selection)
+    packages = [
+        "ca-certificates",
+        "dbus",
+        "initramfs-tools",
+        "keyboard-configuration",
+        "locales",
+        "network-manager",
+        spec.keyring_package,
+        spec.kernel_package,
+        "tzdata",
+    ]
+    if plan.user.sudo:
+        packages.append("sudo")
+    if bool(getattr(plan.user, "install_ssh_server", False)):
+        packages.append("openssh-server")
+    packages.extend(spec.base_packages)
+    packages.extend(
+        spec.desktop_packages if selection.variant == "desktop" else spec.server_packages
+    )
+    return tuple(sorted(set(packages)))
+
+
+def distro_sources_list(selection: DistroSelection) -> tuple[str, str]:
+    """Return ``(sources.list text, keyring path)`` for an isolated APT check."""
+
+    spec = _spec_for(selection)
+    return spec.sources, spec.keyring
 
 
 def _spec_for(selection: DistroSelection) -> _DistroSpec:

@@ -19,3 +19,12 @@ def test_api_error_formatter_never_coerces_validation_objects_to_object_object()
     assert "function formatApiError(payload" in source
     assert "item.msg ?? item.message ?? item.type" in source
     assert "formatApiError(payload, response.statusText" in source
+
+
+def test_ui_defaults_and_disk_too_small_and_log_download() -> None:
+    source = WEB_APP.read_text(encoding="utf-8")
+    assert "includeData: false" in source
+    assert "function previewErrorHtml" in source
+    assert "storage.disk_too_small" in source
+    assert "/api/install/log" in source
+    assert "progress.download_log" in source

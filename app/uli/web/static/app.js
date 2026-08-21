@@ -46,7 +46,7 @@ const state = {
   rootSizesMib: {},
   includeSwap: true,
   swapSizeMib: 8192,
-  includeData: true,
+  includeData: false,
   dataSizeMib: 65536,
 
   diskId: "",
@@ -782,6 +782,19 @@ function partitionPlanHtml(partitions, options = {}) {
   return `<div class="partition-visual" role="img" aria-label="${th("storage.visual_label")}">${bar}</div><ul class="partition-list ${options.compact ? "compact" : ""}">${rows}</ul>`;
 }
 
+function previewErrorHtml(preview) {
+  if (!preview?.error) return "";
+  if (preview.error === "disk_too_small" || preview.error_code === "disk_too_small") {
+    const requiredGib = (Number(preview.required_mib) / 1024).toFixed(1);
+    const availableGib = (Number(preview.available_mib) / 1024).toFixed(1);
+    return `<div class="hint danger">${th("storage.disk_too_small", {
+      required_gib: requiredGib,
+      available_gib: availableGib,
+    })}</div>`;
+  }
+  return `<div class="hint danger">${th("storage.disk_error", { error: preview.error })}</div>`;
+}
+
 function warningText(warning) {
   const raw = String(warning || "");
   if (raw.startsWith("below_minimum:")) {
@@ -817,9 +830,7 @@ async function viewStorage() {
       }).join("")
     : `<div class="hint danger">${th("error.no_disk")}</div>`;
   const warnings = (state.preview?.warnings || []).map((warning) => `<div class="hint warning">${escapeHtml(warningText(warning))}</div>`).join("");
-  const previewError = state.preview?.error
-    ? `<div class="hint danger">${th("storage.disk_error", { error: state.preview.error })}</div>`
-    : "";
+  const previewError = previewErrorHtml(state.preview);
   return `
     <div class="eyebrow">${th("step.storage")}</div>
     <h3>${th("storage.title")}</h3>
@@ -841,9 +852,7 @@ async function viewReview() {
   const listedDisk = selectedDisk() || {};
   const previewDisk = state.preview?.disk || {};
   const target = { ...listedDisk, ...previewDisk };
-  const error = state.preview?.error
-    ? `<div class="hint danger">${th("storage.disk_error", { error: state.preview.error })}</div>`
-    : "";
+  const error = previewErrorHtml(state.preview);
   const warnings = (state.preview?.warnings || []).map((warning) => `<div class="hint warning">${escapeHtml(warningText(warning))}</div>`).join("");
   return `
     <div class="eyebrow">${th("step.review")}</div>
@@ -920,6 +929,7 @@ async function viewInstall() {
       </div>
       ${downloads ? `<section class="download-list" aria-label="${th("download.overview")}">${downloads}</section>` : ""}
       ${logs.length ? `<details class="log-panel" ${status === "error" || status === "failed" ? "open" : ""}><summary>${th("progress.log")}</summary><pre>${escapeHtml(logs.join("\n"))}</pre></details>` : ""}
+      ${status === "error" || status === "failed" ? `${job.artifact_dir ? `<div class="hint"><strong>${th("progress.log_path")}</strong><br><code>${escapeHtml(`${String(job.artifact_dir).replace(/\/$/, "")}/install.log`)}</code></div>` : ""}${job.has_install_log ? `<a class="btn ghost" href="/api/install/log" download="install.log">${th("progress.download_log")}</a>` : ""}` : ""}
       ${status === "error" || status === "failed" || unverified ? `<button type="button" class="btn ghost" id="btnInstallRetry">${th("progress.back_to_review")}</button>` : ""}
     </div>`;
 }

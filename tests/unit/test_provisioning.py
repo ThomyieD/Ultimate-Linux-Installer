@@ -181,6 +181,7 @@ def test_provision_plan_contains_machine_configuration_and_no_plain_secret() -> 
 
     all_argv = [record.argv for record in result.commands]
     assert any("task-gnome-desktop" in argv for argv in all_argv)
+    assert any("tasksel" in argv and "install" in argv and "standard" in argv for argv in all_argv)
     assert any("ubuntu-standard" in argv and "openssh-server" in argv for argv in all_argv)
     assert (
         sum(
@@ -542,6 +543,93 @@ def test_verify_system_requires_resolved_nonempty_kernel_links() -> None:
         assert ("test", "-L", path) in commands
         assert ("readlink", "-e", path) in commands
         assert ("test", "-s", path) in commands
+
+
+def test_debian_tasksel_standard_runs_after_tasksel_package() -> None:
+    plan = _plan()
+    plan.mode = "simple"
+    plan.distributions = [
+        DistroSelection(
+            "debian",
+            "server",
+            "Debian Server",
+            release="trixie",
+            hostname="debserver",
+        )
+    ]
+    plan.partitions = [
+        part
+        for part in plan.partitions
+        if part.role in {"esp", "swap"} or (part.distribution or "").startswith("debian")
+    ]
+    for part in plan.partitions:
+        if part.role == "root":
+            part.distribution = "debian:server"
+
+    result = provision_plan(plan, dry_run=True, mount_root="/mnt/uli-test")
+    argv_list = [record.argv for record in result.commands]
+
+    def has_tasksel_apt(argv: tuple[str, ...]) -> bool:
+        return "apt-get" in argv and "install" in argv and "tasksel" in argv
+
+    def is_tasksel_standard(argv: tuple[str, ...]) -> bool:
+        return list(argv[-3:]) == ["tasksel", "install", "standard"]
+
+    apt_indexes = [index for index, argv in enumerate(argv_list) if has_tasksel_apt(argv)]
+    tasksel_indexes = [index for index, argv in enumerate(argv_list) if is_tasksel_standard(argv)]
+    assert apt_indexes and tasksel_indexes
+    assert apt_indexes[0] < tasksel_indexes[0]
+    assert all("task-gnome-desktop" not in argv for argv in argv_list)
+
+
+def test_debian_desktop_includes_gnome_metapackage_and_tasksel_standard() -> None:
+    plan = _plan()
+    result = provision_plan(plan, dry_run=True, mount_root="/mnt/uli-test")
+    argv_list = [record.argv for record in result.commands]
+    assert any("task-gnome-desktop" in argv for argv in argv_list)
+    assert any(list(argv[-3:]) == ["tasksel", "install", "standard"] for argv in argv_list)
+
+
+def test_tasksel_standard_failure_is_not_swallowed() -> None:
+    from uli.install.runner import CommandExecutionError, CommandOutcome, CommandRecord
+
+    plan = _plan()
+    plan.mode = "simple"
+    plan.distributions = [
+        DistroSelection(
+            "debian",
+            "server",
+            "Debian Server",
+            release="trixie",
+            hostname="debserver",
+        )
+    ]
+    plan.partitions = [
+        part
+        for part in plan.partitions
+        if part.role in {"esp", "swap"} or (part.distribution or "").startswith("debian")
+    ]
+    for part in plan.partitions:
+        if part.role == "root":
+            part.distribution = "debian:server"
+
+    class BoomRunner(CommandRunner):
+        def run(self, argv, **kwargs):  # type: ignore[no-untyped-def]
+            raw = tuple(str(item) for item in argv)
+            if list(raw[-3:]) == ["tasksel", "install", "standard"]:
+                record = CommandRecord(argv=raw)
+                raise CommandExecutionError(
+                    CommandOutcome(record=record, returncode=1, stderr="tasksel failed")
+                )
+            return super().run(argv, **kwargs)
+
+    with pytest.raises(CommandExecutionError, match="tasksel failed"):
+        provision_plan(
+            plan,
+            dry_run=True,
+            runner=BoomRunner(dry_run=True, use_sudo=False),
+            mount_root="/mnt/uli-test",
+        )
 
 
 def test_grub_refuses_missing_real_uuid() -> None:

@@ -4,6 +4,7 @@ import pytest
 from uli.core.plan import DistroSelection, PartitionSpec
 from uli.storage.layout import (
     SAFETY_MIB,
+    DiskTooSmallError,
     custom_root_layout,
     equal_root_layout,
     validate_layout,
@@ -36,8 +37,10 @@ def test_equal_layout_uses_exact_configured_swap_and_data_sizes() -> None:
 
 
 def test_equal_layout_soft_preview_warns_but_real_plan_is_strict() -> None:
-    with pytest.raises(ValueError, match="minimum sizes"):
+    with pytest.raises(DiskTooSmallError) as excinfo:
         equal_root_layout(40 * GIB, _distros())
+    assert excinfo.value.code == "disk_too_small"
+    assert excinfo.value.required_mib > excinfo.value.available_mib > 0
 
     parts, warnings = equal_root_layout(
         40 * GIB,
@@ -143,3 +146,55 @@ def test_disabled_auxiliary_partition_rejects_nonzero_size() -> None:
             swap_size_mib=1024,
             include_data=False,
         )
+
+
+def test_fresh_simple_debian_server_fits_40_gib_without_data() -> None:
+    parts, warnings = equal_root_layout(
+        40 * GIB,
+        [DistroSelection("debian", "server", "Debian Server")],
+        include_swap=True,
+        swap_size_mib=8192,
+        include_data=False,
+        minimum_root_gib={"debian:server": 20},
+    )
+    roles = [part.role for part in parts]
+    assert roles == ["esp", "root", "swap"]
+    assert next(part for part in parts if part.role == "root").size_mib >= 20 * 1024
+    assert "data" not in roles
+    assert warnings == []
+
+
+def test_explicit_64_gib_data_on_40_gib_disk_is_fail_closed() -> None:
+    with pytest.raises(DiskTooSmallError) as excinfo:
+        equal_root_layout(
+            40 * GIB,
+            [DistroSelection("debian", "server", "Debian Server")],
+            include_swap=True,
+            swap_size_mib=8192,
+            include_data=True,
+            data_size_mib=65_536,
+            minimum_root_gib={"debian:server": 20},
+        )
+    error = excinfo.value
+    assert error.code == "disk_too_small"
+    assert error.required_mib > 40 * 1024
+    assert error.available_mib == 40 * 1024
+
+
+def test_equal_root_required_uses_largest_minimum_for_mixed_distros() -> None:
+    with pytest.raises(DiskTooSmallError) as excinfo:
+        equal_root_layout(
+            47 * GIB,
+            [
+                DistroSelection("debian", "server", "Debian Server"),
+                DistroSelection("ubuntu", "server", "Ubuntu Server"),
+            ],
+            include_swap=False,
+            include_data=False,
+            minimum_root_gib={"debian:server": 20, "ubuntu:server": 25},
+        )
+    error = excinfo.value
+    # ESP + safety + 2 * max(20, 25) GiB = 52 GiB
+    assert error.required_mib == (1 + 1 + 2 * 25) * 1024
+    assert error.available_mib == 47 * 1024
+    assert error.required_mib > error.available_mib

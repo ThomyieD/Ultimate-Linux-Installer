@@ -7,6 +7,24 @@ from dataclasses import dataclass
 from uli.core.plan import DistroSelection, Filesystem, PartitionSpec
 
 
+class DiskTooSmallError(ValueError):
+    """Capacity failure with stable machine-readable fields for the UI."""
+
+    def __init__(
+        self,
+        *,
+        required_mib: int,
+        available_mib: int,
+        code: str = "disk_too_small",
+    ) -> None:
+        if required_mib <= 0 or available_mib <= 0:
+            raise ValueError("required_mib and available_mib must be positive")
+        self.code = code
+        self.required_mib = int(required_mib)
+        self.available_mib = int(available_mib)
+        super().__init__(code)
+
+
 @dataclass
 class DiskInfo:
     id: str
@@ -187,17 +205,23 @@ def equal_root_layout(
         )
 
     fixed_mib = ESP_MIB + SAFETY_MIB + swap_mib + data_mib
-    available_mib = total_mib - fixed_mib
-    per_root_mib = align_down(available_mib // len(distros))
+    available_for_roots = total_mib - fixed_mib
+    per_root_mib = align_down(available_for_roots // len(distros))
+    root_minima = [_minimum_root_mib(distro, minimum_root_gib) for distro in distros]
     if per_root_mib < ABSOLUTE_MINIMUM_ROOT_MIB:
-        raise ValueError("Disk too small for the requested layout")
+        required_mib = fixed_mib + ABSOLUTE_MINIMUM_ROOT_MIB * len(distros)
+        raise DiskTooSmallError(required_mib=required_mib, available_mib=total_mib)
 
-    for distro in distros:
-        minimum_mib = _minimum_root_mib(distro, minimum_root_gib)
+    for distro, minimum_mib in zip(distros, root_minima, strict=True):
         if per_root_mib < minimum_mib:
             warnings.append(f"below_minimum:{distro.id}:{minimum_mib // 1024}")
             if strict_minimums:
-                raise ValueError("Disk too small for selected distributions and minimum sizes")
+                # Equal-size roots must each satisfy the largest individual minimum.
+                required_mib = fixed_mib + max(root_minima) * len(distros)
+                raise DiskTooSmallError(
+                    required_mib=required_mib,
+                    available_mib=total_mib,
+                )
 
     parts: list[PartitionSpec] = [
         PartitionSpec(role="esp", size_mib=ESP_MIB, filesystem="fat32", label="EFI")
@@ -283,7 +307,10 @@ def custom_root_layout(
 
     remaining_mib = total_mib - SAFETY_MIB - sum(part.size_mib for part in parts)
     if remaining_mib < 0:
-        raise ValueError("Selected partition sizes exceed disk capacity")
+        raise DiskTooSmallError(
+            required_mib=SAFETY_MIB + sum(part.size_mib for part in parts),
+            available_mib=total_mib,
+        )
 
     if not include_data and data_size_mib not in (None, 0):
         raise ValueError("data size was provided although data is disabled")
@@ -299,7 +326,10 @@ def custom_root_layout(
                 minimum_mib=MINIMUM_DATA_MIB,
             )
         if data_mib > remaining_mib:
-            raise ValueError("Selected partition sizes exceed disk capacity")
+            raise DiskTooSmallError(
+                required_mib=SAFETY_MIB + sum(part.size_mib for part in parts) + data_mib,
+                available_mib=total_mib,
+            )
         if data_mib:
             if data_mib < MINIMUM_DATA_MIB:
                 raise ValueError(f"data partition must be at least {MINIMUM_DATA_MIB} MiB")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import threading
@@ -19,6 +20,7 @@ from uli.bootloader.grub import (
     validate_uefi_environment,
 )
 from uli.core.plan import InstallationPlan
+from uli.install.apt_preflight import AptPreflightError, run_apt_preflight
 from uli.install.provision import ProvisionResult, provision_plan, validate_host_timezone
 from uli.install.sources import verify_plan_sources
 from uli.state.machine import InstallState, default_state_path, load_state
@@ -40,6 +42,9 @@ class InstallJob:
     dry_run: bool = True
     installation_complete: bool = False
     _state_path: str = field(default="", repr=False)
+    _log_path: str = field(default="", repr=False)
+    _secret_needles: tuple[str, ...] = field(default=(), repr=False)
+    _generation: int = field(default=0, repr=False)
     _thread: threading.Thread | None = field(default=None, repr=False)
 
 
@@ -47,6 +52,7 @@ _job = InstallJob()
 _lock = threading.RLock()
 _PLAN_ID = re.compile(r"^[a-f0-9]{12}$")
 _REQUIRED_REAL_TOOLS = (
+    "apt-get",
     "blkid",
     "chroot",
     "debootstrap",
@@ -70,6 +76,8 @@ _REQUIRED_REAL_TOOLS = (
 
 def get_job() -> dict[str, Any]:
     with _lock:
+        log_path = Path(_job._log_path) if _job._log_path else None
+        has_log = bool(log_path and log_path.is_file())
         return {
             "status": _job.status,
             "phase": _job.phase,
@@ -83,7 +91,31 @@ def get_job() -> dict[str, Any]:
             "log": list(_job.log[-80:]),
             "dry_run": _job.dry_run,
             "installation_complete": _job.installation_complete,
+            "has_install_log": has_log,
+            "install_log_name": "install.log" if has_log else "",
         }
+
+
+def get_install_log_path() -> Path | None:
+    """Return the current job's install.log or None (no client-controlled path)."""
+
+    with _lock:
+        if not _job._log_path or not _job.artifact_dir:
+            return None
+        log_path = Path(_job._log_path)
+        artifact = Path(_job.artifact_dir)
+    try:
+        log_resolved = log_path.resolve()
+        artifact_resolved = artifact.resolve()
+    except OSError:
+        return None
+    if log_resolved.name != "install.log":
+        return None
+    if log_resolved.parent != artifact_resolved:
+        return None
+    if not log_resolved.is_file():
+        return None
+    return log_resolved
 
 
 def _set(**values: Any) -> None:
@@ -92,11 +124,39 @@ def _set(**values: Any) -> None:
             setattr(_job, key, value)
 
 
+def _secret_needles(plan: InstallationPlan) -> tuple[str, ...]:
+    needles: list[str] = []
+    password_hash = plan.user.password_hash
+    if isinstance(password_hash, str) and password_hash:
+        needles.append(password_hash)
+    for key in plan.user.ssh_keys:
+        if isinstance(key, str) and key.strip():
+            needles.append(key.strip())
+    return tuple(needles)
+
+
+def _redact(message: str, needles: tuple[str, ...]) -> str:
+    text = message
+    for needle in needles:
+        if needle:
+            text = text.replace(needle, "<redacted>")
+    return text
+
+
 def _log(message: str) -> None:
     with _lock:
-        _job.log.append(message)
+        text = _redact(str(message), _job._secret_needles)
+        _job.log.append(text)
         if len(_job.log) > 500:
             _job.log = _job.log[-500:]
+        log_path = _job._log_path
+    if log_path:
+        try:
+            with open(log_path, "a", encoding="utf-8") as handle:
+                handle.write(text + "\n")
+        except OSError as exc:
+            with _lock:
+                _job.log.append(f"install.log write failed: {exc}")
 
 
 def start_install(plan: InstallationPlan, *, dry_run: bool = False) -> dict[str, Any]:
@@ -125,6 +185,10 @@ def start_install(plan: InstallationPlan, *, dry_run: bool = False) -> dict[str,
         _job.dry_run = dry_run
         _job.installation_complete = False
         _job._state_path = ""
+        _job._log_path = ""
+        _job._generation += 1
+        generation = _job._generation
+        _job._secret_needles = _secret_needles(plan)
 
     def runner() -> None:
         try:
@@ -151,14 +215,14 @@ def start_install(plan: InstallationPlan, *, dry_run: bool = False) -> dict[str,
                     failed_state = load_state(failed_state_path)
                     if failed_state.plan_id == plan.plan_id:
                         failed_state.status = "failed"
-                        failed_state.error = str(exc)
+                        failed_state.error = _redact(str(exc), _secret_needles(plan))
                         failed_state.save(failed_state_path)
                 except (OSError, ValueError, TypeError, json.JSONDecodeError) as state_error:
                     _log(f"state save failed: {state_error}")
             _set(
                 status="error",
                 phase="failed",
-                error=str(exc),
+                error=_redact(str(exc), _secret_needles(plan)),
                 message="Installation fehlgeschlagen",
                 installation_complete=False,
             )
@@ -166,6 +230,11 @@ def start_install(plan: InstallationPlan, *, dry_run: bool = False) -> dict[str,
             # The hash is no longer needed after account provisioning and must
             # not remain reachable through the global job/thread lifecycle.
             plan.user.password_hash = None
+            with _lock:
+                # Only the worker that still owns the global slot may clear
+                # needles; a successor job must keep its own redaction set.
+                if _job._generation == generation:
+                    _job._secret_needles = ()
 
     thread = threading.Thread(target=runner, name="uli-install", daemon=True)
     with _lock:
@@ -232,6 +301,16 @@ def _assign_dry_run_uuids(plan: InstallationPlan) -> None:
         )
 
 
+def _open_install_log(out: Path) -> Path:
+    log_path = out / "install.log"
+    fd = os.open(log_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+    return log_path
+
+
 def _preflight_installation(plan: InstallationPlan, *, dry_run: bool) -> None:
     """Validate the complete root/GRUB plan and all host tools before wiping."""
     preview = deepcopy(plan)
@@ -284,7 +363,8 @@ def _run(plan: InstallationPlan, *, dry_run: bool) -> tuple[InstallState, Path]:
         shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True, exist_ok=False)
     out.chmod(0o700)
-    _set(artifact_dir=str(out))
+    log_path = _open_install_log(out)
+    _set(artifact_dir=str(out), _log_path=str(log_path))
     _write_audit(out, plan, dry_run=dry_run)
     _log(f"plan={plan.plan_id} target={plan.disk.id} cache={out}")
 
@@ -317,6 +397,12 @@ def _run(plan: InstallationPlan, *, dry_run: bool) -> tuple[InstallState, Path]:
     # Platform/firmware/Secure-Boot support is also checked before the wipe.
     validate_uefi_environment(dry_run=dry_run)
     _preflight_installation(plan, dry_run=dry_run)
+
+    _set(phase="verify", message="Paketauflösung wird vor dem Wipe geprüft", percent=18)
+    try:
+        run_apt_preflight(plan, out, dry_run=dry_run, log=_log)
+    except AptPreflightError as exc:
+        raise RuntimeError(str(exc)) from exc
 
     # Dry-run must remain host-independent, so UUID placeholders are inserted
     # only after the storage command plan is validated and recorded.

@@ -239,6 +239,81 @@ def test_full_dry_run_job_completes_honestly(monkeypatch, tmp_path) -> None:
     assert '"password_hash": null' in combined
 
 
+def test_fresh_wizard_defaults_disable_data_partition() -> None:
+    client = _client()
+    state = client.get("/api/state").json()
+    assert state["include_data"] is False
+    assert state["data_size_mib"] == 65536
+    assert state["include_swap"] is True
+    assert state["swap_size_mib"] == 8192
+
+
+def test_preview_returns_structured_disk_too_small(monkeypatch: pytest.MonkeyPatch) -> None:
+    from uli.storage.disks import DiskInfo
+
+    small = DiskInfo(
+        id="sim-40",
+        path="/dev/sda",
+        size_bytes=40 * 1024**3,
+        model="VMware Virtual Disk",
+        serial="VM40",
+    )
+    monkeypatch.setattr(
+        "uli.web.server.get_disks",
+        lambda simulate=False: [small],
+    )
+    client = _client()
+    payload = _valid_state()
+    payload["selected"] = [{"id": "debian", "variant": "server"}]
+    payload["hostnames"] = {"debian:server": "debian-server"}
+    payload["boot_default"] = "debian:server"
+    payload["root_sizes_mib"] = {}
+    payload["include_data"] = True
+    payload["data_size_mib"] = 65_536
+    payload["disk_id"] = "sim-40"
+    assert client.post("/api/state", json=payload).status_code == 200
+    preview = client.get("/api/storage/preview", params={"disk_id": "sim-40"}).json()
+    assert preview["plan_fingerprint"] == ""
+    assert preview["error"] == "disk_too_small"
+    assert preview["error_code"] == "disk_too_small"
+    assert preview["required_mib"] > preview["available_mib"] > 0
+    assert "Disk too small" not in preview["error"]
+
+
+def test_preview_40gib_debian_server_without_data_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from uli.storage.disks import DiskInfo
+
+    small = DiskInfo(
+        id="sim-40",
+        path="/dev/sda",
+        size_bytes=40 * 1024**3,
+        model="VMware Virtual Disk",
+        serial="VM40",
+    )
+    monkeypatch.setattr(
+        "uli.web.server.get_disks",
+        lambda simulate=False: [small],
+    )
+    client = _client()
+    payload = _valid_state()
+    payload["selected"] = [{"id": "debian", "variant": "server"}]
+    payload["hostnames"] = {"debian:server": "debian-server"}
+    payload["boot_default"] = "debian:server"
+    payload["root_sizes_mib"] = {}
+    payload["include_data"] = False
+    payload["disk_id"] = "sim-40"
+    assert client.post("/api/state", json=payload).status_code == 200
+    preview = client.get("/api/storage/preview", params={"disk_id": "sim-40"}).json()
+    assert preview["error"] == ""
+    assert preview["plan_fingerprint"]
+    roles = [part["role"] for part in preview["partitions"]]
+    assert roles == ["esp", "root", "swap"]
+    root = next(part for part in preview["partitions"] if part["role"] == "root")
+    assert root["size_mib"] >= 20 * 1024
+
+
 def test_state_rejects_unsupported_selection_and_unsafe_ssh_policy() -> None:
     client = _client()
     unsupported = _valid_state()
