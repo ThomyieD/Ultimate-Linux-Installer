@@ -19,7 +19,8 @@ keinen sudo-ISO-Build und keinen Reboot aus.
 Wenn der Scope nicht ausreicht oder Vorgaben widersprüchlich sind, stoppe und
 dokumentiere den Blocker, statt den Scope zu erweitern.
 
-Schreibe am Ende den vollständigen Bericht nach
-ai/handovers/TASK-001.md gemäß ai/handovers/TEMPLATE.md.
+Ermittle die Task-ID aus der in ai/ACTIVE_TASK genannten Datei. Schreibe am
+Ende den vollständigen Bericht nach ai/handovers/<TASK-ID>.md gemäß
+ai/handovers/TEMPLATE.md.
 Erstelle keinen Commit und pushe nichts.
 ```

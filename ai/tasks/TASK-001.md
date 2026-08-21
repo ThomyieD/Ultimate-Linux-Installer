@@ -1,6 +1,6 @@
 # TASK-001 – Debian-13-Archivschlüssel im Live-ISO aktualisieren
 
-Status: APPROVED / Gate D bestanden / Gate E ausstehend
+Status: APPROVED / Gate D bestanden / Gate E fehlgeschlagen; Folgetask TASK-004
 
 Priorität: P0 / blockiert reale Debian-Installation
 

@@ -2,11 +2,13 @@
 
 Stand: 2026-08-21
 
-Anwendungs-Baseline: `5a696df` (`main`, mit `origin/main` synchron)
+Anwendungs-Baseline: `5a696df`
+
+Planungs-Baseline: `a4c20ac` (`main`, mit `origin/main` synchron vor TASK-004)
 
 Release-Entscheidung: **NO-GO für produktive Nutzung**
 
-Aktiver Task: `TASK-001` – Implementierung freigegeben, Gate E ausstehend
+Aktiver Task: `TASK-004` – READY_FOR_CURSOR
 
 ## Funktionsstand
 
@@ -29,10 +31,21 @@ Aktiver Task: `TASK-001` – Implementierung freigegeben, Gate E ausstehend
   `artifacts/ultimate-linux-installer-0.3.0-amd64.iso`
 - SHA-256:
   `cf9fe39c5d2bbff58b2eb75995412639b20532249ecfe7502d0569c4846f24c7`
-- Gate E bleibt offen: die korrigierte Debian-Installation muss noch auf einer
-  entbehrlichen Testdisk vollständig bis zum Boot des Zielsystems laufen.
+- Gate E ist fehlgeschlagen und bleibt offen. Die Vertrauenskette aus TASK-001
+  funktioniert: der Laptoplauf protokolliert erfolgreich
+  `verified sources: debian-trixie-InRelease` und erreicht die
+  Paketinstallation. Er scheitert erst danach bei 59 Prozent am nicht
+  existierenden Paket `task-standard`.
+- Der Laptoplauf hatte zu diesem Zeitpunkt Partitionstabelle und Dateisysteme
+  bereits erstellt. Der Testdatenträger enthält deshalb nur eine partielle,
+  nicht freigegebene Installation.
+- VMware erkennt die 40-GiB-Testdisk korrekt. Der frische Wizard reserviert
+  aber standardmäßig 1 GiB ESP, 1 GiB Reserve, 8 GiB Swap, 64 GiB Daten und
+  mindestens 20 GiB Root; der angeforderte Plan braucht damit etwa 94 GiB.
+- `TASK-004` behebt beide Gate-E-Blocker, prüft benannte Pakete isoliert vor
+  dem Wipe und macht das vollständige Fehlerprotokoll exportierbar.
 
-## Bekannte Inkonsistenzen nach TASK-001
+## Bekannte Inkonsistenzen und Risiken
 
 - Der reale Ubuntu-Pfad ermittelt 26.04 LTS (`resolute`) zur Laufzeit, aber das
   Noble-Live-Chroot enthält `debootstrap 1.0.134ubuntu2` ohne Suite-Skript
@@ -43,5 +56,10 @@ Aktiver Task: `TASK-001` – Implementierung freigegeben, Gate E ausstehend
 - Ein kompletter zerstörender VM-Durchlauf mit anschließendem Boot aller
   installierten Einträge ist noch nicht abgenommen.
 - Automatische Wiederaufnahme nach Stromausfall ist nicht freigegeben.
+- Bis TASK-004 darf kein weiterer produktiver oder ungesicherter Debian-
+  Installationsversuch erfolgen. Als vorläufiger VMware-Workaround passt eine
+  einfache Debian-Installation auf 40 GiB, wenn die gemeinsame Datenpartition
+  in den Einstellungen bewusst deaktiviert wird; der Paketfehler bleibt im
+  aktuellen ISO trotzdem bestehen.
 - Die frühere `[object Object]`-Meldung wird im aktuellen Frontend formatiert;
   ältere Test-ISOs enthalten diesen Fix möglicherweise noch nicht.
