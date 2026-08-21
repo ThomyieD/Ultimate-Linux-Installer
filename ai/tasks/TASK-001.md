@@ -1,6 +1,6 @@
 # TASK-001 – Debian-13-Archivschlüssel im Live-ISO aktualisieren
 
-Status: READY_FOR_CURSOR
+Status: APPROVED / Gate D bestanden / Gate E ausstehend
 
 Priorität: P0 / blockiert reale Debian-Installation
 
@@ -8,7 +8,7 @@ Owner: Cursor
 
 Reviewer: Codex/Sol
 
-Anwendungs-Baseline: `5f3acd2`
+Implementierungs-Commit: `5a696df`
 
 ## Ziel
 

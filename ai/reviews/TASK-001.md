@@ -63,12 +63,22 @@ Das ist kein Freigabeblocker, weil die Sicherheitslogik vollständig offline
 ausgeführt wird und der identische reale Paketpfad im Review separat
 erfolgreich geprüft wurde.
 
-## Verbleibende Gates
+## Nachgelagertes Artefakt-Gate
 
-Diese Freigabe schließt das Code-Review von TASK-001 ab. Sie ist noch keine
-Releasefreigabe. Gate D/E bleiben gemäß Task und Sicherheitsregeln getrennt
-ausstehend: frischer ISO-Build, ISO-Verifier und anschließender Test in einer
-Wegwerf-VM.
+Nach Nutzerfreigabe wurde Gate D am 2026-08-21 ausgeführt und bestanden:
+
+- frischer kanonischer ISO-Build: PASS
+- SHA-256-Prüfung: PASS
+- Hybrid-/UEFI-Struktur und beide `BOOTX64.EFI`: PASS
+- Debian-13-Keyring im read-only gemounteten SquashFS: PASS
+- QEMU-OVMF-Live-Boot bis `ULI_LIVE_READY`: PASS
+- Artefakt: `artifacts/ultimate-linux-installer-0.3.0-amd64.iso`
+- SHA-256:
+  `cf9fe39c5d2bbff58b2eb75995412639b20532249ecfe7502d0569c4846f24c7`
+
+Die Freigabe ist weiterhin keine Releasefreigabe. Gate E bleibt ausstehend:
+vollständige Installation auf einer entbehrlichen VM-Testdisk, ISO entfernen,
+Zielsystem booten und erwarteten GRUB-/Login-Nachweis erbringen.
 
 ## Entscheidung
 

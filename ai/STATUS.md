@@ -2,11 +2,11 @@
 
 Stand: 2026-08-21
 
-Anwendungs-Baseline: `5f3acd2` (`main`, mit `origin/main` synchron)
+Anwendungs-Baseline: `5a696df` (`main`, mit `origin/main` synchron)
 
 Release-Entscheidung: **NO-GO für produktive Nutzung**
 
-Aktiver Task: `TASK-001`
+Aktiver Task: `TASK-001` – Implementierung freigegeben, Gate E ausstehend
 
 ## Funktionsstand
 
@@ -16,16 +16,21 @@ Aktiver Task: `TASK-001`
   Ubuntu-LTS-Version, jeweils Desktop und Server
 - Chef-GRUB, echte UUIDs/PARTUUIDs und abgesicherte Zielplattenidentität
 - Add/Remove, Fedora, Arch und Proxmox bewusst gesperrt
-- Automatisierte Baseline: `122 passed`, Ruff, Shell-Syntax und ShellCheck grün
+- Automatisierte Baseline: `134 passed`, 1 optionaler Test übersprungen;
+  Ruff, Shell-Syntax und ShellCheck grün
 
-## Aktueller Blocker
+## Aktueller Prüfstand
 
-Die reale Debian-Installation stoppt sicher vor dem Wipe bei der Prüfung von
-`trixie/InRelease`. Das ISO enthält aus Ubuntu Noble
-`debian-archive-keyring 2023.4ubuntu1` und damit nicht die Debian-13-Schlüssel.
-Das aktuelle, dreifach signierte Debian-13.6-Manifest ergibt damit `gpgv` Exit
-2. Mit `debian-archive-keyring 2025.1` werden alle Signaturen verifiziert und
-`gpgv` endet mit Exit 0. Details: `ai/tasks/TASK-001.md`.
+- TASK-001 wurde unter `5a696df` implementiert und im Codex-Review freigegeben.
+- Ein frisches ISO wurde am 2026-08-21 erfolgreich gebaut.
+- Gate D ist bestanden: SHA-256, Hybrid-/UEFI-Struktur, Debian-13-Keyring im
+  SquashFS und QEMU-OVMF-Live-Boot bis zum gesunden ULI-Backend wurden geprüft.
+- Artefakt:
+  `artifacts/ultimate-linux-installer-0.3.0-amd64.iso`
+- SHA-256:
+  `cf9fe39c5d2bbff58b2eb75995412639b20532249ecfe7502d0569c4846f24c7`
+- Gate E bleibt offen: die korrigierte Debian-Installation muss noch auf einer
+  entbehrlichen Testdisk vollständig bis zum Boot des Zielsystems laufen.
 
 ## Bekannte Inkonsistenzen nach TASK-001
 
