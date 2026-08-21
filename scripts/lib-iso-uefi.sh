@@ -54,7 +54,7 @@ uli_make_efi_boot_image() {
     -o "$efi_out" \
     -p /EFI/BOOT \
     all_video boot cat chain configfile echo fat ext2 \
-    gfxmenu gfxterm gzio halt iso9660 linux linuxefi loadenv loopback \
+    gfxmenu gfxterm gzio halt iso9660 linux loadenv loopback \
     ls lsefi lsefimmap normal part_gpt part_msdos probe reboot \
     regexp search search_fs_file search_fs_uuid search_label \
     serial sleep terminal test true video
@@ -76,7 +76,9 @@ EOF
 
   cp "$img_dir/boot/grub/grub.cfg" "$mnt/boot/grub/grub.cfg"
 
-  # Ubuntu GRUB's `linux` may still look for linuxefi.mod on $prefix — ship modules on ISO.
+  # Keep the complete module tree on the ISO for runtime dependencies and
+  # firmware variants. Noble's x86_64-efi build uses linux.mod directly and
+  # deliberately does not ship the downstream-only linuxefi.mod.
   mkdir -p "$img_dir/boot/grub/x86_64-efi"
   cp -a "$grub_dir"/. "$img_dir/boot/grub/x86_64-efi/"
 

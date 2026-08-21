@@ -35,7 +35,12 @@ class ArchAdapter:
     def generate_automation(
         self, plan: InstallationPlan, selection: DistroSelection
     ) -> dict[str, str]:
-        root = next(p for p in plan.partitions if p.role == "root" and p.distribution == "arch")
+        root = next(
+            p
+            for p in plan.partitions
+            if p.role == "root"
+            and p.distribution in {"arch", f"arch:{selection.variant}"}
+        )
         cfg = {
             "disk": plan.disk.path,
             "root_label": root.label,

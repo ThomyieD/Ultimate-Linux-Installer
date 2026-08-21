@@ -36,7 +36,12 @@ class FedoraAdapter:
         self, plan: InstallationPlan, selection: DistroSelection
     ) -> dict[str, str]:
         desktop = selection.variant == "workstation"
-        root = next(p for p in plan.partitions if p.role == "root" and p.distribution == "fedora")
+        root = next(
+            p
+            for p in plan.partitions
+            if p.role == "root"
+            and p.distribution in {"fedora", f"fedora:{selection.variant}"}
+        )
         ks = dedent(
             f"""\
             # Ultimate Linux Installer – Fedora Kickstart

@@ -1,59 +1,99 @@
-# Architecture overview
+# Architekturübersicht (v0.3)
 
-## Goals
+## Produktgrenzen
 
-- Universal x86_64 UEFI installer (not tied to one laptop)
-- Looks and feels like a product installer, not a live desktop with scripts
-- Stable multiboot result matching the themed GRUB target look
-- Resumable, adapter-based automation per distro family
+ULI v0.3 ist ein x86_64-Whole-Disk-Installer für UEFI-Systeme mit deaktiviertem Secure Boot. Er unterstützt zwei ausführbare Modi:
 
-## Boot chain
+| Modus | Verhalten in v0.3 |
+|---|---|
+| Einfach | Genau eine freigegebene Distribution, der gewählte Datenträger wird vollständig neu aufgebaut |
+| Multiboot | Mindestens zwei freigegebene Distributionen, gemeinsame ESP, eigene ext4-Root-Partitionen |
+| Hinzufügen | In der UI sichtbar, technisch gesperrt |
+| Entfernen | In der UI sichtbar, technisch gesperrt |
 
-1. Firmware starts the USB stick (GRUB/shim)
-2. Minimal Debian live environment boots
-3. Autostart launches `uli` fullscreen dark UI
-4. User completes wizard; confirmed plan is persisted
-5. Orchestrator partitions (once), installs each distro via its adapter
-6. After each distro installer, BootOrder is reclaimed to `UltimateInstaller`
-7. Finalization writes central `grub.cfg`, themes, kernel symlink hooks, sudo/swap guards
-8. Reboot into themed menu
+Als reale Zielsysteme sind derzeit Debian 13 und Ubuntu 24.04 LTS freigegeben, jeweils als Desktop oder Server. Fedora, Arch Linux und Proxmox VE sind Katalog-/Roadmap-Einträge und werden vom Backend als nicht freigegeben abgewiesen. Proxmox bleibt im Zielbild auf den einfachen Modus beschränkt.
 
-## Installation modes
+## Laufzeitarchitektur
 
-| Mode | Behavior |
-|------|----------|
-| Simple | One distro; wipe disk; official unattended path preferred |
-| Multiboot | Several roots + shared ESP; controlled/hybrid install |
-| Add | Detect existing ULI layout; carve space; install one more |
-| Remove | Drop a root, grow neighbors/data, refresh GRUB |
-
-Proxmox is **simple-only** (no multiboot conversion).
-
-## Adapters
-
-Each adapter provides:
-
-- `resolve_release()` – newest *supported* release metadata + checksums
-- `generate_automation()` – preseed / autoinstall / kickstart / pacstrap assets
-- `post_install_hooks()` – chroot snippets for ULI guarantees
-
-## Lessons encoded from the Lenovo multiboot project
-
-| Failure mode | ULI mitigation |
-|--------------|----------------|
-| Distro GRUB becomes chef / hidden menu | Central GRUB + BootOrder reclaim script |
-| Missing / wrong menu entries | Direct UUID linux entries, no os-prober dependency |
-| Broken Arch/CachyOS kernel paths | Relative `ln -sfr` hooks to `/vmlinuz` & `/initrd.img` |
-| Slow boots (stale resume UUID) | Shared swap UUID written into resume configs |
-| Debian user without sudo | Explicit sudoers drop-in |
-| USB selected as target | Installation medium detection + exclusion |
-| Power loss mid-install | JSON state machine with resume |
-
-## Safety
-
-```python
-if not installation_plan.confirmed:
-    raise RuntimeError("Destructive storage operation was not confirmed")
+```text
+UEFI-Firmware (Secure Boot aus)
+  └─ USB: hybrides Ubuntu-Noble-Live-Image
+      ├─ LightDM + Openbox + Firefox im Kiosk-Modus (unprivilegierter Benutzer)
+      └─ systemd: privilegierter lokaler ULI-Webdienst
+          ├─ FastAPI: validierter Zustand und Bestätigungsprotokoll
+          ├─ Storage: Erkennung, Layout, Partitionierung, Dateisysteme
+          ├─ Sources: InRelease-Download und gpgv-Prüfung
+          ├─ Provisioning: debootstrap, APT und chroot-Konfiguration
+          ├─ State: atomisches Installationsjournal
+          └─ Bootloader: gemeinsamer GRUB und Distro-Update-Hooks
 ```
 
-Dry-run is default outside the live image. QEMU tests use throwaway `qcow2` disks only.
+Die primäre Oberfläche ist kein eingebetteter Distro-Installer, sondern ein lokaler Web-Kiosk. Der Browser ist reine Darstellungsschicht und besitzt keine Root-Rechte. Die frühere PySide6-Oberfläche bleibt ausschließlich als erzwungener Dry-Run-Entwicklungspfad vorhanden und kann keine reale Installation starten.
+
+## Neun Schritte der Oberfläche
+
+1. **Netzwerk:** Ethernet/WLAN erkennen, verbinden und Internetzugriff prüfen
+2. **Modus:** einfache Installation oder Multiboot wählen; Hinzufügen/Entfernen als gesperrt kennzeichnen
+3. **Distributionen:** nur freigegebene Kombinationen auswählbar machen
+4. **Quellen:** Version, offizieller Spiegel und Prüfverfahren transparent anzeigen
+5. **Einstellungen:** Benutzer, gehashtes Passwort, Hostnamen je System, SSH, Sprache, Tastatur, Zeitzone, DHCP, Partitionen und Bootmenü
+6. **Speicher:** vom Backend erkannte Datenträger wählen und das berechnete GPT-Layout anzeigen
+7. **Prüfung:** Löschwirkung, Warnungen und SHA-256-Plan-Fingerabdruck anzeigen; ausdrückliche Zustimmung einholen
+8. **Installation:** Backend-Phasen, aktuelle Distribution und Protokoll verfolgen
+9. **Abschluss:** nur nach realem Erfolg einen Neustart anbieten; Dry-Run eindeutig als Simulation ausweisen
+
+## Vertrauensgrenze und Bestätigung
+
+Der Browser darf keinen Linux-Gerätepfad und keine behauptete Datenträgergröße übergeben. `GET /api/disks` liefert eine opake ID; das Backend löst diese ID bei Vorschau, Bestätigung und Start erneut gegen die aktuelle Blockgeräteerkennung auf. Installationsmedium, gemountete Geräte und aktive Swap-Ziele werden ausgeschlossen beziehungsweise unmittelbar vor der Änderung abgewiesen.
+
+```text
+validierter Wizard-Zustand + aktuelle Disk-Identität
+  → unveränderlicher Installationsplan
+  → kanonischer SHA-256-Fingerabdruck
+  → ausdrückliche Bestätigung
+  → kurzlebiges Einmal-Token
+  → erneute Prüfung von Revision, Token und Disk
+  → plan.confirmed = true
+  → Orchestrator darf starten
+```
+
+Jede Zustandsänderung entwertet Vorschau und Token. Nur `simple`/`multiboot` mit `wipe=true` gelangen zum Storage-Executor. Kommandos werden als Argumentlisten ohne Shell-Interpolation ausgeführt. Das Benutzerpasswort wird früh gehasht; öffentliche Zustände, Audit-Dateien und Fortschrittsmeldungen enthalten weder Klartextpasswort noch Passwort-Hash.
+
+## Installationspipeline
+
+1. Plan, Modus, UEFI/x86_64 und Secure-Boot-Zustand fail-closed validieren; GRUB-Konfiguration, Fonts, Module und einen echten temporären EFI-Loader vorab bauen.
+2. Für jede verwendete Distribution das offizielle HTTPS-`InRelease` laden und mit dem mitgelieferten Debian-/Ubuntu-Archiv-Keyring über `gpgv` prüfen.
+3. Erst danach den ausgewählten Datenträger als GPT neu aufbauen und ESP, Root- sowie optionale Swap-/Datenpartitionen formatieren.
+4. Echte UUIDs/PARTUUIDs nach dem Formatieren erneut einlesen.
+5. Debian 13 (`trixie`) beziehungsweise Ubuntu 24.04 LTS (`noble`) mit `debootstrap` direkt in die jeweilige Root-Partition installieren.
+6. APT-Quellen, Desktop-/Server-Pakete, Benutzer, sudo, SSH, Locale, Tastatur, Zeitzone, DHCP, `fstab`, Swap und Initramfs im chroot konfigurieren.
+7. Jede Root-Installation prüfen und stabile Kernel-/Initrd-Verweise samt Update-Hook einrichten.
+8. Aus den realen Kennungen ein minimales zentrales `grub.cfg` erstellen, Syntax prüfen und GRUB unter `EFI/UltimateInstaller` sowie als Fallback unter `EFI/BOOT` installieren.
+9. Einen an die aktuelle ESP-PARTUUID gebundenen UEFI-NVRAM-Eintrag setzen, `UltimateInstaller` nachweislich an die erste Stelle der Bootreihenfolge bringen und andernfalls nicht als abgeschlossen melden.
+10. Abschlusszustand atomisch schreiben; nur eine reale, vollständig erfolgreiche Installation erlaubt den Neustart über die API.
+
+Die Distributionen werden somit nicht als ISO-Dateien heruntergeladen oder als fremde GUI-Installer ineinander gestartet. Für den aktuell unterstützten Debian-/Ubuntu-Pfad ist die signierte Paketquelle die Installationsquelle.
+
+## Partitions- und Bootmodell
+
+Ein neuer Plan enthält eine FAT32-ESP, eine ext4-Root-Partition pro Distribution und optional Swap beziehungsweise eine gemeinsame Datenpartition. Mindestgrößen der Adapter werden strikt geprüft. Bei gleichmäßiger Aufteilung wird nur tatsächlich verfügbarer Platz verteilt; bei individueller Aufteilung werden die gewünschten Root-Größen und der verbleibende Platz validiert.
+
+Chef-GRUB verwendet direkte `search --fs-uuid`-/`linux`-Einträge anstelle von `os-prober`. Pro Distribution erscheint ein sauberer Haupteintrag; der Firmware-Eintrag bleibt zuletzt. Theme, Anzeigenamen, Standardsystem und Timeout stammen aus dem bestätigten Plan. Kernel-Update-Hooks in den Zielsystemen halten die stabilen Kernel-/Initrd-Pfade aktuell.
+
+## Zustand und Wiederaufnahme
+
+Das Installationsjournal kennt unter anderem die Phasen `validated`, `sources_verified`, `partitioning`, `filesystems`, `installing`, `verifying`, `bootloader`, `completed` und `failed`. Es wird mit restriktiven Rechten atomisch ersetzt. Das schafft die Grundlage für Diagnose und spätere Wiederaufnahme.
+
+Die lückenlose Wiederaufnahme nach einem Stromausfall an jedem Pipeline-Punkt ist noch nicht abgenommen. Das Journal darf deshalb derzeit nicht als Garantie verstanden werden, eine unterbrochene reale Installation automatisch fertigzustellen.
+
+## Build und Veröffentlichung
+
+`sudo scripts/build-iso.sh` ist der kanonische Builder. Er erzeugt ein Ubuntu-Noble-basiertes Live-System mit Python-Laufzeit, lokalem Webdienst, Firefox-Kiosk, Netzwerk/Firmware, Storage-/APT-/GRUB-Werkzeugen und hybridem BIOS-/UEFI-Boot-Layout. Das Produktziel und der freigegebene Installationsmodus bleiben UEFI; die BIOS-Bootfähigkeit des Mediums erweitert nicht den unterstützten Zielumfang.
+
+Lokale Images und Prüfsummen liegen unter `artifacts/`. Große ISO-Dateien werden nicht in Git versioniert. Der manuell ausgelöste GitHub-Workflow veröffentlicht zunächst ein Workflow-Artefakt; ein Upload zu [GitHub Releases](https://github.com/ThomyieD/Ultimate-Linux-Installer/releases) erfolgt nur mit ausdrücklich angegebenem Release-Tag.
+
+## Prüfung und offene Abnahme
+
+Automatisierte Unit-, API- und Dry-Run-Tests prüfen unter anderem Layoutgrenzen, verbotene Modi/Distributionen, Secret-Redaktion, Bestätigungstoken, sichere Befehlsübergabe, Provisionierungspläne und GRUB mit echten Kennungen. Der ISO-Check prüft Struktur und UEFI-Bootbestandteile; QEMU dient als Wegwerf-Testumgebung.
+
+Nicht abgeschlossen sind die destruktive Hardware-End-to-End-Abnahme aller vier freigegebenen Varianten, eine breite Hardwarematrix, Secure Boot, die zusätzlichen Distributionen und sichere Bestandsänderungen für Hinzufügen/Entfernen. Bis dahin ist v0.3 als technisch testbarer Integrationsstand zu behandeln, nicht als auf beliebiger Hardware abgenommenes Produktionswerkzeug.

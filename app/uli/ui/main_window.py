@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
 )
 
 from uli.i18n import set_language, tr
-from uli.ui.pages.download import DownloadPage
-from uli.ui.pages.done import DonePage
 from uli.ui.pages.distros import DistrosPage
+from uli.ui.pages.done import DonePage
+from uli.ui.pages.download import DownloadPage
 from uli.ui.pages.manage import ManagePage
 from uli.ui.pages.mode import ModePage
 from uli.ui.pages.network import NetworkPage

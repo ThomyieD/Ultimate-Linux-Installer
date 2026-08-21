@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import socket
 import subprocess
 import time
 import urllib.error
@@ -13,7 +12,6 @@ CHECK_URLS = (
     "https://deb.debian.org",
     "https://connectivitycheck.gstatic.com/generate_204",
     "http://detectportal.firefox.com/success.txt",
-    "https://1.1.1.1",
 )
 
 
@@ -28,7 +26,13 @@ def _run(cmd: list[str], *, timeout: float = 20) -> subprocess.CompletedProcess[
 
 
 def check_internet(timeout: float = 3.0, url: str | None = None) -> bool:
-    """Return True when outbound IP/HTTP(S) works."""
+    """Return True only when HTTP(S) *and DNS* work for installer sources.
+
+    A raw connection to a public IP is not sufficient: provisioning needs to
+    resolve official repository hostnames.  Treating that as ``online`` made
+    the wizard advance although the subsequent signed-source check had to
+    fail with a name-resolution error.
+    """
     urls = (url,) if url else CHECK_URLS
     for candidate in urls:
         if not candidate:
@@ -40,12 +44,6 @@ def check_internet(timeout: float = 3.0, url: str | None = None) -> bool:
                 if 200 <= code < 500 or code in {204, 301, 302}:
                     return True
         except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-            continue
-    for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53), ("9.9.9.9", 443)):
-        try:
-            socket.create_connection((host, port), timeout=timeout).close()
-            return True
-        except OSError:
             continue
     return False
 

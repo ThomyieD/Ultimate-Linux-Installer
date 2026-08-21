@@ -1,19 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ThomyieD/Ultimate-Linux-Installer/schemas/installation_plan.schema.json",
-  "title": "Ultimate Linux Installer Plan",
+  "title": "Ultimate Linux Installer Plan v0.3",
   "type": "object",
-  "required": ["plan_id", "mode", "locale", "disk", "partitions", "distributions", "user", "bootloader"],
   "additionalProperties": false,
+  "required": ["plan_id", "created_at", "mode", "locale", "disk", "partitions", "distributions", "user", "bootloader", "network", "confirmed"],
   "properties": {
-    "plan_id": { "type": "string", "minLength": 8 },
-    "created_at": { "type": "string" },
-    "mode": {
-      "type": "string",
-      "enum": ["simple", "multiboot", "add", "remove"]
-    },
+    "plan_id": { "type": "string", "pattern": "^[a-f0-9]{12}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "mode": { "type": "string", "enum": ["simple", "multiboot", "add", "remove"] },
     "locale": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["language", "timezone", "keyboard"],
       "properties": {
         "language": { "type": "string" },
@@ -23,14 +21,18 @@
     },
     "disk": {
       "type": "object",
-      "required": ["id", "path", "size_bytes", "table", "wipe"],
+      "additionalProperties": false,
+      "required": ["id", "path", "size_bytes", "table", "wipe", "model", "serial", "wwn", "major_minor", "disk_sequence"],
       "properties": {
-        "id": { "type": "string" },
-        "path": { "type": "string" },
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/dev/" },
         "model": { "type": "string" },
         "serial": { "type": "string" },
+        "wwn": { "type": "string" },
+        "major_minor": { "type": "string", "pattern": "^(?:[0-9]+:[0-9]+)?$" },
+        "disk_sequence": { "type": "integer", "minimum": 0 },
         "size_bytes": { "type": "integer", "minimum": 1 },
-        "table": { "type": "string", "enum": ["gpt"] },
+        "table": { "const": "gpt" },
         "wipe": { "type": "boolean" }
       }
     },
@@ -39,20 +41,15 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["role", "size_mib"],
+        "additionalProperties": false,
+        "required": ["role", "size_mib", "filesystem", "distribution", "label", "partuuid", "uuid"],
         "properties": {
-          "role": {
-            "type": "string",
-            "enum": ["esp", "root", "swap", "data"]
-          },
-          "distribution": { "type": "string" },
+          "role": { "type": "string", "enum": ["esp", "root", "swap", "data"] },
+          "distribution": { "type": ["string", "null"] },
           "size_mib": { "type": "integer", "minimum": 1 },
-          "filesystem": {
-            "type": "string",
-            "enum": ["fat32", "ext4", "btrfs", "xfs", "swap"]
-          },
-          "label": { "type": "string" },
-          "partuuid": { "type": ["string", "null"] },
+          "filesystem": { "type": "string", "enum": ["fat32", "ext4", "btrfs", "xfs", "swap"] },
+          "label": { "type": ["string", "null"] },
+          "partuuid": { "type": "string", "format": "uuid" },
           "uuid": { "type": ["string", "null"] }
         }
       }
@@ -62,47 +59,53 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "variant", "display_name"],
+        "additionalProperties": false,
+        "required": ["id", "variant", "display_name", "release", "desktop", "hostname"],
         "properties": {
-          "id": { "type": "string" },
-          "variant": { "type": "string" },
-          "display_name": { "type": "string" },
+          "id": { "type": "string", "minLength": 1 },
+          "variant": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
           "release": { "type": ["string", "null"] },
-          "desktop": { "type": ["string", "null"] }
+          "desktop": { "type": ["string", "null"] },
+          "hostname": { "type": ["string", "null"] }
         }
       }
     },
     "user": {
       "type": "object",
-      "required": ["username"],
+      "additionalProperties": false,
+      "required": ["username", "password_hash", "ssh_keys", "sudo", "disable_password_auth", "install_ssh_server"],
       "properties": {
         "username": { "type": "string", "minLength": 1 },
         "password_hash": { "type": ["string", "null"] },
-        "ssh_keys": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "sudo": { "type": "boolean", "default": true },
-        "disable_password_auth": { "type": "boolean", "default": false }
+        "ssh_keys": { "type": "array", "items": { "type": "string" } },
+        "sudo": { "type": "boolean" },
+        "disable_password_auth": { "type": "boolean" },
+        "install_ssh_server": { "type": "boolean" }
       }
     },
     "bootloader": {
       "type": "object",
-      "required": ["kind", "theme", "timeout_seconds"],
+      "additionalProperties": false,
+      "required": ["kind", "theme", "timeout_seconds", "efi_directory", "default_entry"],
       "properties": {
-        "kind": { "type": "string", "enum": ["grub"] },
+        "kind": { "const": "grub" },
         "theme": { "type": "string" },
         "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
-        "efi_directory": { "type": "string", "default": "UltimateInstaller" }
+        "efi_directory": { "type": "string" },
+        "default_entry": { "type": ["string", "null"] }
       }
     },
     "network": {
       "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "ssid", "persist"],
       "properties": {
         "method": { "type": "string", "enum": ["dhcp", "static", "wifi"] },
-        "ssid": { "type": ["string", "null"] }
+        "ssid": { "type": ["string", "null"] },
+        "persist": { "type": "boolean" }
       }
     },
-    "confirmed": { "type": "boolean", "default": false }
+    "confirmed": { "type": "boolean" }
   }
 }

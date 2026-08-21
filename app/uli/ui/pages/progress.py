@@ -58,9 +58,7 @@ class ProgressPage(BasePage):
         (out / "reclaim-bootorder.sh").write_text(render_efi_bootorder_fix(), encoding="utf-8")
 
         guard = StorageGuard(dry_run=True)
-        cmds = guard.apply_partition_table(
-            plan.disk.path, plan.partitions, confirmed=True
-        )
+        cmds = guard.apply_plan(plan)
         (out / "partition-commands.sh").write_text("\n".join(cmds) + "\n", encoding="utf-8")
 
         state = InstallState(

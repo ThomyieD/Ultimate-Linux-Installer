@@ -6,6 +6,16 @@ title-font: "DejaVu Sans Bold 20"
 message-color: "#9aa3b2"
 message-font: "DejaVu Sans Regular 14"
 
++ label {
+  left = 10%
+  top = 11%
+  width = 80%
+  height = 40
+  text = "Ultimate Linux Installer"
+  color = "#ffffff"
+  font = "DejaVu Sans Bold 20"
+}
+
 + boot_menu {
   left = 10%
   top = 20%

@@ -6,7 +6,6 @@ from textwrap import dedent
 from typing import Any
 
 import yaml
-
 from uli.bootloader import grub as grubmod
 from uli.core.adapters import AdapterInfo, register
 from uli.core.plan import DistroSelection, InstallationPlan
@@ -43,7 +42,8 @@ class UbuntuAdapter:
         roots = [
             p
             for p in plan.partitions
-            if p.role == "root" and p.distribution == "ubuntu"
+            if p.role == "root"
+            and p.distribution in {"ubuntu", f"ubuntu:{selection.variant}"}
         ]
         root = next(
             (p for p in roots if selection.variant in (p.label or "")),

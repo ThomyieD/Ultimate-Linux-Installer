@@ -39,7 +39,10 @@ class DebianAdapter:
         self, plan: InstallationPlan, selection: DistroSelection
     ) -> dict[str, str]:
         root = next(
-            p for p in plan.partitions if p.role == "root" and p.distribution == "debian"
+            p
+            for p in plan.partitions
+            if p.role == "root"
+            and p.distribution in {"debian", f"debian:{selection.variant}"}
         )
         desktop = selection.variant == "desktop"
         pkgs = "sudo openssh-server"

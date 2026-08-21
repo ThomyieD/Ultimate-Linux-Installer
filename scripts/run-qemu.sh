@@ -19,7 +19,8 @@ qemu-system-x86_64 \
   -smp 4 \
   -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
   -drive if=pflash,format=raw,file="$VARS" \
-  -drive file="$DISK",format=qcow2,if=virtio \
+  -drive file="$DISK",format=qcow2,if=none,id=uli_testdisk \
+  -device virtio-blk-pci,drive=uli_testdisk,serial=ULI-QEMU-TEST-001 \
   -cdrom "$ISO" \
   -boot order=d \
   -netdev user,id=net0 \

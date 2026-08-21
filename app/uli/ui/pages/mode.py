@@ -8,7 +8,7 @@ from uli.ui.pages.base import BasePage
 
 
 class _ModeRow(QFrame):
-    def __init__(self, mode_id: str, title_key: str, desc_key: str, parent_page: "ModePage") -> None:
+    def __init__(self, mode_id: str, title_key: str, desc_key: str, parent_page: ModePage) -> None:
         super().__init__()
         self.mode_id = mode_id
         self.parent_page = parent_page
@@ -28,7 +28,7 @@ class _ModeRow(QFrame):
         lay.addWidget(self.title)
         lay.addWidget(self.desc)
 
-    def mousePressEvent(self, event) -> None:  # noqa: N802
+    def mousePressEvent(self, event) -> None:
         self.parent_page.select(self.mode_id)
         super().mousePressEvent(event)
 

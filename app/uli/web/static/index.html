@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Ultimate Linux Installer</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.2.9" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.3.0" />
 </head>
 <body>
+  <a class="skip-link" id="skipLink" href="#main">Zum Inhalt springen</a>
   <div class="app">
     <header class="top">
       <div>
@@ -14,19 +15,22 @@
         <h1 id="appTitle">Ultimate Linux Installer</h1>
         <p class="sub" id="appSub"></p>
       </div>
-      <select class="lang" id="langSelect" aria-label="Language">
-        <option value="de">Deutsch</option>
-        <option value="en">English</option>
-      </select>
+      <div class="language-picker">
+        <label class="sr-only" for="langSelect" id="langLabel">Sprache</label>
+        <select class="lang" id="langSelect" aria-labelledby="langLabel">
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+        </select>
+      </div>
     </header>
 
     <div class="shell">
-      <aside class="rail">
+      <aside class="rail" id="stepRail" aria-label="Installationsschritte">
         <h2 id="railTitle">Setup</h2>
         <ol class="steps" id="stepList"></ol>
       </aside>
 
-      <main class="main" id="main"></main>
+      <main class="main" id="main" tabindex="-1"></main>
     </div>
 
     <footer class="footer">
@@ -35,11 +39,12 @@
     </footer>
   </div>
 
-  <div class="toast" id="toast" role="status">
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true">
     <strong id="toastTitle"></strong>
     <span id="toastBody"></span>
   </div>
 
-  <script src="/static/app.js?v=0.2.9"></script>
+  <noscript>Für den Ultimate Linux Installer muss JavaScript aktiviert sein.</noscript>
+  <script src="/static/app.js?v=0.3.0"></script>
 </body>
 </html>

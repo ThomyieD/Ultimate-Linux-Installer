@@ -1,0 +1,16 @@
+[connection]
+id=ULI wired DHCP
+uuid=1568f529-a0ac-4b17-a2f7-681a705d6927
+type=ethernet
+autoconnect=true
+autoconnect-priority=100
+autoconnect-retries=0
+multi-connect=3
+
+[ethernet]
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto

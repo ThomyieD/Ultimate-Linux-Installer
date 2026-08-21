@@ -108,23 +108,25 @@ else
   QEMU_FW=(-bios "$OVMF_CODE")
 fi
 
-# Boot ISO as USB-style disk (closer to Rufus DD) and as CDROM.
+# Boot the ISO under OVMF.  v0.3 emits a marker only after systemd has started
+# the real ULI backend and its health endpoint answers inside the live system.
 SERIAL_LOG="$TMP/serial.log"
-timeout 90 qemu-system-x86_64 \
+set +e
+timeout 180 qemu-system-x86_64 \
   -machine q35,accel=tcg \
-  -m 1536 \
+  -m 2048 \
   "${QEMU_FW[@]}" \
-  -drive "file=$ISO,format=raw,if=none,id=cd,readonly=on" \
-  -device virtio-scsi-pci \
-  -device "scsi-cd,drive=cd,bootindex=1" \
+  -cdrom "$ISO" \
+  -boot order=d \
+  -netdev user,id=net0 \
+  -device virtio-net-pci,netdev=net0 \
   -serial file:"$SERIAL_LOG" \
   -display none \
   -no-reboot \
-  >/dev/null 2>"$TMP/qemu.err" || true
+  >/dev/null 2>"$TMP/qemu.err"
+QEMU_STATUS=$?
+set -e
 
-# Also try GRUB console: inject early search via expecting menu text in serial is hard
-# without gfxterm. Re-run with console=ttyS0 on a second attempt using -kernel is not ISO test.
-# Check that OVMF actually started and did not immediately exit with "no bootable device".
 {
   echo "---- qemu stderr (tail) ----"
   tail -n 40 "$TMP/qemu.err" || true
@@ -132,54 +134,16 @@ timeout 90 qemu-system-x86_64 \
   tail -n 80 "$SERIAL_LOG" || true
 } | tee "$TMP/boot-excerpt.txt"
 
-# Strong structural checks already passed. Soft boot signal:
-if grep -qiE 'Booting|GRUB|Ultimate Linux|vmlinuz|error: no such device|No bootable' "$TMP/boot-excerpt.txt" "$SERIAL_LOG" 2>/dev/null; then
-  if grep -qiE 'No bootable device|BXE.Boot000|failed to load Boot' "$TMP/qemu.err" "$SERIAL_LOG" 2>/dev/null; then
-    # Some OVMF builds only log to debugcon
-    :
-  fi
-fi
-
-# Dedicated debugcon boot check (OVMF often prints here)
-DEBUG_LOG="$TMP/debugcon.log"
-timeout 75 qemu-system-x86_64 \
-  -machine q35,accel=tcg \
-  -m 1536 \
-  "${QEMU_FW[@]}" \
-  -cdrom "$ISO" \
-  -boot order=d \
-  -debugcon file:"$DEBUG_LOG" -global isa-debugcon.iobase=0x402 \
-  -serial file:"$TMP/serial2.log" \
-  -display none \
-  -no-reboot \
-  >/dev/null 2>"$TMP/qemu2.err" || true
-
-echo "---- OVMF debugcon (filtered) ----"
-grep -iE 'BdsDxe|Boot|EFI|grub|FSOpen|LoadImage|start image|error' "$DEBUG_LOG" 2>/dev/null | head -n 60 || true
-
-if grep -qiE 'you need to load the kernel first|linuxefi.mod. not found' \
-  "$DEBUG_LOG" "$TMP/serial2.log" "$SERIAL_LOG" 2>/dev/null; then
+if grep -qiE 'you need to load the kernel first|linuxefi\.mod.*not found|no bootable device' \
+  "$SERIAL_LOG" "$TMP/qemu.err" 2>/dev/null; then
   echo "FAIL: GRUB menu reached but kernel load failed (linuxefi/modules)" >&2
   exit 1
 fi
 
-if grep -qiE 'Booting Ultimate Linux|Linux version|Run /init|live-boot|Welcome to' \
-  "$DEBUG_LOG" "$TMP/serial2.log" "$SERIAL_LOG" 2>/dev/null; then
-  echo "PASS: UEFI boot reached GRUB and started kernel/init"
-elif grep -qiE 'grub|Ultimate Linux Installer|vmlinux|vmlinuz' \
-  "$DEBUG_LOG" "$TMP/serial2.log" "$SERIAL_LOG" 2>/dev/null; then
-  echo "PASS: UEFI boot reached GRUB/kernel"
-elif grep -qiE 'Start Image|LoadImage.*BOOTX64|FSOpen.*BOOTX64' "$DEBUG_LOG" 2>/dev/null; then
-  echo "PASS: OVMF loaded BOOTX64.EFI (GRUB started; console may be graphical only)"
-else
-  # Final hard gate: file checks already prove Rufus-visible UEFI payload.
-  # Boot console can be silent with gfxterm — still fail if OVMF says nothing bootable.
-  if grep -qiE 'no bootable|failed to start|does not support|Not Found' "$DEBUG_LOG" "$TMP/qemu2.err" 2>/dev/null \
-     && ! grep -qiE 'BOOTX64|Start Image' "$DEBUG_LOG" 2>/dev/null; then
-    echo "FAIL: OVMF did not load UEFI bootloader" >&2
-    exit 1
-  fi
-  echo "WARN: no clear GRUB serial marker (gfxterm); structural UEFI checks passed"
+if ! grep -q 'ULI_LIVE_READY' "$SERIAL_LOG"; then
+  echo "FAIL: live system did not start a healthy ULI backend (qemu status $QEMU_STATUS)" >&2
+  exit 1
 fi
 
+echo "PASS: OVMF booted the live system and the ULI backend became healthy"
 echo "ALL UEFI CHECKS PASSED for $ISO"
