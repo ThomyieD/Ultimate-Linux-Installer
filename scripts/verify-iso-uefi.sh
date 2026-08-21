@@ -2,6 +2,11 @@
 # Verify ULI ISO has real UEFI boot + boots under OVMF.
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck disable=SC1091
+# shellcheck source=scripts/lib-debian-archive-keyring.sh
+source "$ROOT/scripts/lib-debian-archive-keyring.sh"
+
 ISO="${1:-}"
 if [ -z "$ISO" ]; then
   echo "usage: $0 /path/to.iso" >&2
@@ -15,16 +20,19 @@ need mount
 need umount
 need file
 need qemu-system-x86_64
+need gpg
+need sha256sum
 
 TMP="$(mktemp -d /tmp/uli-verify-XXXXXX)"
 cleanup() {
+  umount "$TMP/rootfs" 2>/dev/null || true
   umount "$TMP/esp" 2>/dev/null || true
   umount "$TMP/iso" 2>/dev/null || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 
-mkdir -p "$TMP/iso" "$TMP/esp" "$TMP/pflash"
+mkdir -p "$TMP/iso" "$TMP/esp" "$TMP/pflash" "$TMP/rootfs"
 
 echo "== El Torito =="
 xorriso -indev "$ISO" -report_el_torito plain 2>&1 | tee "$TMP/eltorito.txt"
@@ -77,6 +85,15 @@ echo "ESP BOOTX64.EFI: $ESP_SIZE bytes — $(file -b "$ESP_EFI")"
   echo "FAIL: ISO missing boot/grub/grub.cfg" >&2
   exit 1
 }
+
+echo "== Debian 13 archive keyring trust anchors =="
+[ -s "$TMP/iso/live/filesystem.squashfs" ] || {
+  echo "FAIL: ISO lacks live/filesystem.squashfs" >&2
+  exit 1
+}
+mount -o loop,ro "$TMP/iso/live/filesystem.squashfs" "$TMP/rootfs"
+uli_debian_archive_keyring_verify_installed "$TMP/rootfs"
+umount "$TMP/rootfs" || umount -l "$TMP/rootfs" || true
 
 umount "$TMP/esp" || umount -l "$TMP/esp" || true
 umount "$TMP/iso" || umount -l "$TMP/iso" || true

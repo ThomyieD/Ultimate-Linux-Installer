@@ -44,6 +44,7 @@ jobs:
           .ci-venv/bin/ruff check app adapters tests
           shellcheck scripts/build-iso.sh scripts/build-iso-simple.sh \
             scripts/lib-runtime-bundle.sh \
+            scripts/lib-debian-archive-keyring.sh \
             scripts/generate-theme-assets.sh scripts/install-firefox-tarball.sh \
             scripts/lib-iso-uefi.sh scripts/verify-iso-uefi.sh
 

@@ -43,7 +43,8 @@ need() {
     exit 1
   }
 }
-for tool in debootstrap mksquashfs xorriso rsync mkfs.vfat grub-mkimage sha256sum; do
+for tool in debootstrap mksquashfs xorriso rsync mkfs.vfat grub-mkimage \
+  sha256sum curl dpkg-deb gpg; do
   need "$tool"
 done
 
@@ -246,7 +247,17 @@ LIVE_USERNAME="uli"
 LIVE_USER_DEFAULT_GROUPS="audio cdrom dip video plugdev netdev"
 EOF
 
-echo "[4/7] Minimize and pack squashfs..."
+echo "[4/7] Pin Debian archive keyring and pack squashfs..."
+# Replace the Ubuntu-packaged debian-archive-keyring (often too old for Debian 13)
+# with the version-pinned upstream artefact.  Maintainer scripts are never run.
+# The helper is linted via release-iso.yml; check.sh does not yet list it (TASK-001 scope).
+# shellcheck disable=SC1091
+# shellcheck source=scripts/lib-debian-archive-keyring.sh
+source "$ROOT/scripts/lib-debian-archive-keyring.sh"
+KEYRING_WORK="$WORK/scratch/debian-archive-keyring"
+mkdir -p "$KEYRING_WORK"
+uli_debian_archive_keyring_install_into_chroot "$CHROOT" "$KEYRING_WORK"
+
 chroot "$CHROOT" apt-get clean
 rm -rf "$CHROOT/var/lib/apt/lists"/* "$CHROOT/tmp"/* "$CHROOT/var/tmp"/*
 # ``debootstrap`` needs the build host's resolver, but preserving that regular
@@ -262,6 +273,8 @@ if mount | grep -Fq "$CHROOT/"; then
   exit 1
 fi
 uli_verify_runtime_bundle_security "$CHROOT"
+# Fail closed before squashfs if Debian 13 trust anchors are incomplete.
+uli_debian_archive_keyring_verify_installed "$CHROOT"
 mksquashfs "$CHROOT" "$IMG/live/filesystem.squashfs" -comp xz -e boot
 
 kernel="$(find "$CHROOT/boot" -maxdepth 1 -name 'vmlinuz-*' -type f | sort -V | tail -n1)"
