@@ -2,13 +2,13 @@
 
 Stand: 2026-08-21
 
-Anwendungs-Baseline: `5a696df`
+Anwendungs-Baseline: `75fc70a`
 
-Planungs-Baseline: `a4c20ac` (`main`, mit `origin/main` synchron vor TASK-004)
+Planungs-Baseline: `786d11c` (TASK-004-Plan)
 
 Release-Entscheidung: **NO-GO für produktive Nutzung**
 
-Aktiver Task: `TASK-004` – READY_FOR_CURSOR
+Aktiver Task: `TASK-004` – APPROVED / Gate D PASS / Gate E ausstehend
 
 ## Funktionsstand
 
@@ -18,32 +18,27 @@ Aktiver Task: `TASK-004` – READY_FOR_CURSOR
   Ubuntu-LTS-Version, jeweils Desktop und Server
 - Chef-GRUB, echte UUIDs/PARTUUIDs und abgesicherte Zielplattenidentität
 - Add/Remove, Fedora, Arch und Proxmox bewusst gesperrt
-- Automatisierte Baseline: `134 passed`, 1 optionaler Test übersprungen;
+- Automatisierte Baseline: `152 passed`, 1 optionaler Test übersprungen;
   Ruff, Shell-Syntax und ShellCheck grün
 
 ## Aktueller Prüfstand
 
-- TASK-001 wurde unter `5a696df` implementiert und im Codex-Review freigegeben.
-- Ein frisches ISO wurde am 2026-08-21 erfolgreich gebaut.
-- Gate D ist bestanden: SHA-256, Hybrid-/UEFI-Struktur, Debian-13-Keyring im
-  SquashFS und QEMU-OVMF-Live-Boot bis zum gesunden ULI-Backend wurden geprüft.
+- TASK-004 wurde unter `75fc70a` implementiert, im Codex-Review freigegeben und
+  auf `origin/main` veröffentlicht.
+- Ein frisches ISO wurde am 2026-08-21 aus diesem Commit erfolgreich gebaut.
+- Gate D ist bestanden: SHA-256, Hybrid-/UEFI-Struktur, beide `BOOTX64.EFI`,
+  Debian-13-Keyring im SquashFS und QEMU-OVMF-Live-Boot bis
+  `ULI_LIVE_READY` wurden geprüft.
 - Artefakt:
   `artifacts/ultimate-linux-installer-0.3.0-amd64.iso`
 - SHA-256:
-  `cf9fe39c5d2bbff58b2eb75995412639b20532249ecfe7502d0569c4846f24c7`
-- Gate E ist fehlgeschlagen und bleibt offen. Die Vertrauenskette aus TASK-001
-  funktioniert: der Laptoplauf protokolliert erfolgreich
-  `verified sources: debian-trixie-InRelease` und erreicht die
-  Paketinstallation. Er scheitert erst danach bei 59 Prozent am nicht
-  existierenden Paket `task-standard`.
-- Der Laptoplauf hatte zu diesem Zeitpunkt Partitionstabelle und Dateisysteme
-  bereits erstellt. Der Testdatenträger enthält deshalb nur eine partielle,
-  nicht freigegebene Installation.
-- VMware erkennt die 40-GiB-Testdisk korrekt. Der frische Wizard reserviert
-  aber standardmäßig 1 GiB ESP, 1 GiB Reserve, 8 GiB Swap, 64 GiB Daten und
-  mindestens 20 GiB Root; der angeforderte Plan braucht damit etwa 94 GiB.
-- `TASK-004` behebt beide Gate-E-Blocker, prüft benannte Pakete isoliert vor
-  dem Wipe und macht das vollständige Fehlerprotokoll exportierbar.
+  `9cf89c070c5ac690506ff3665e4595e6b4b1936d811292cac28e1cb56b9a2c7e`
+- TASK-004 deaktiviert die optionale 64-GiB-Datenpartition im frischen
+  Standardzustand, ersetzt den ungültigen Debian-Paketpfad durch `tasksel`,
+  prüft alle benannten Pakete isoliert vor dem Wipe und exportiert ein
+  redigiertes vollständiges Installationslog.
+- Der frühere Gate-E-Lauf bleibt historisch fehlgeschlagen. Ein neuer
+  vollständiger Gate-E-Lauf mit dem aktuellen ISO wurde noch nicht ausgeführt.
 
 ## Bekannte Inkonsistenzen und Risiken
 
@@ -56,10 +51,7 @@ Aktiver Task: `TASK-004` – READY_FOR_CURSOR
 - Ein kompletter zerstörender VM-Durchlauf mit anschließendem Boot aller
   installierten Einträge ist noch nicht abgenommen.
 - Automatische Wiederaufnahme nach Stromausfall ist nicht freigegeben.
-- Bis TASK-004 darf kein weiterer produktiver oder ungesicherter Debian-
-  Installationsversuch erfolgen. Als vorläufiger VMware-Workaround passt eine
-  einfache Debian-Installation auf 40 GiB, wenn die gemeinsame Datenpartition
-  in den Einstellungen bewusst deaktiviert wird; der Paketfehler bleibt im
-  aktuellen ISO trotzdem bestehen.
+- Das neue ISO ist ausschließlich ein Gate-D-Testartefakt. Eine produktive
+  Freigabe erfordert weiterhin Gate E sowie die nachfolgenden P0-Arbeiten.
 - Die frühere `[object Object]`-Meldung wird im aktuellen Frontend formatiert;
   ältere Test-ISOs enthalten diesen Fix möglicherweise noch nicht.

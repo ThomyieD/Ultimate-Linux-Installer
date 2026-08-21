@@ -4,7 +4,7 @@ Verdict: APPROVED
 
 Reviewer: Codex/Sol
 
-Geprüfter Stand: uncommittierte Änderungen gegen `786d11c`
+Geprüfter Implementierungsstand: Commit `75fc70a`
 
 Handover: `ai/handovers/TASK-004.md` vorhanden und mit dem Diff konsistent
 
@@ -65,10 +65,26 @@ neuen Blocker gefunden.
 
 ## Rest-Risiken
 
-- Automatisierte Tests und der reale APT-Preflight ersetzen noch nicht Gate D
-  und Gate E mit einem neu gebauten ISO.
-- Die Freigabe gilt für den aktuell geprüften uncommittierten Arbeitsbaum. Vor
-  Commit und Build darf der Produkt-Diff nicht mehr verändert werden.
+- Gate E mit vollständiger Installation, entferntem ISO und Boot des
+  Zielsystems bleibt ausstehend.
+- Das Gate-D-Artefakt ist ein lokales Test-ISO und keine Releasefreigabe.
+
+## Nachgelagertes Artefakt-Gate
+
+Nach ausdrücklicher Nutzerfreigabe wurde Gate D am 2026-08-21 auf Commit
+`75fc70a` ausgeführt und bestanden:
+
+- frischer kanonischer ISO-Build: PASS
+- `SHA256SUMS`-Prüfung: PASS
+- Hybrid-BIOS-/UEFI-Struktur und beide `BOOTX64.EFI`: PASS
+- Debian-13-Keyring im read-only gemounteten SquashFS: PASS
+- QEMU-OVMF-Live-Boot bis `ULI_LIVE_READY`: PASS
+- Artefakt: `artifacts/ultimate-linux-installer-0.3.0-amd64.iso`
+- Größe: `1340866560` Bytes
+- SHA-256:
+  `9cf89c070c5ac690506ff3665e4595e6b4b1936d811292cac28e1cb56b9a2c7e`
+
+Gate E und ein Release-Upload wurden nicht ausgeführt.
 
 ## Entscheidung
 

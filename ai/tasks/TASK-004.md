@@ -1,6 +1,6 @@
 # TASK-004 – Gate-E-Fehler vor dem Wipe abfangen und diagnostizierbar machen
 
-Status: READY_FOR_CURSOR
+Status: APPROVED / Gate D bestanden / Gate E ausstehend
 
 Priorität: P0 / blockiert Gate E für Debian und weitere Hardwaretests
 
